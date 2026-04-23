@@ -1,4 +1,4 @@
-name: Release
+name: Release Version
 
 on:
   workflow_dispatch:
@@ -15,13 +15,10 @@ on:
 
 permissions:
   contents: write
-  packages: write
 
 jobs:
   release:
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.bump.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -79,44 +76,3 @@ jobs:
           tag_name: v${{ steps.bump.outputs.version }}
           name: v${{ steps.bump.outputs.version }}
           generate_release_notes: true
-
-  backend-image:
-    runs-on: ubuntu-latest
-    needs:
-      - release
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract image metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ github.repository_owner }}/clinity-backend
-          tags: |
-            type=raw,value=${{ needs.release.outputs.version }}
-            type=raw,value=latest
-
-      - name: Build and push backend image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./backend
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-
-      - name: Upload stack compose artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: stack-compose-v${{ needs.release.outputs.version }}
-          path: |
-            deploy/docker-compose.stack.yml
-            deploy/stack.env.example
-            backend/.env.example

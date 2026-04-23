@@ -5,7 +5,7 @@ export function AppVersion() {
 
   return (
     <div className="text-right">
-      <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Versão</p>
+      <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Layer</p>
       <p className="mt-1 text-xs text-slate-300">{buildInfo.label}</p>
     </div>
   );

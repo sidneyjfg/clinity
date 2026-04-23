@@ -31,16 +31,20 @@ Frontend em Next.js para o SaaS Clinity, conectado ao backend real em `/backend`
 
 O frontend foi preparado para trocar os mocks por chamadas reais ao backend sem alterar a UI principal. Os endpoints futuros já estão mapeados em `lib/backend-contract.ts`.
 
-## Versão exibida na interface
+## Layer exibido na interface
 
-A interface mostra a versão atual do build no cabeçalho e no rodapé.
+A interface mostra o `layer` atual do build no cabeçalho e no rodapé.
 
 Variáveis usadas no build:
 
-- `NEXT_PUBLIC_APP_VERSION`
+- `NEXT_PUBLIC_APP_LAYER_LABEL`
 - `NEXT_PUBLIC_APP_COMMIT_SHA`
 
 Se essas variáveis não forem informadas, o frontend usa fallback local para desenvolvimento.
+
+## Docker
+
+O frontend possui `Dockerfile` próprio com build standalone do Next.js.
 
 ## Backend local
 

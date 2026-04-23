@@ -46,17 +46,20 @@ backend/
 
 O repositório agora usa workflows em `.github/workflows` para:
 
-- validar backend, frontend e build Docker do backend em cada `push` e `pull_request`;
-- gerar nova versão semântica por execução manual do workflow de release;
+- validar backend e frontend em workflows separados;
+- gerar nova versão semântica por execução manual do workflow de versionamento;
 - criar tag e release no GitHub;
-- publicar a imagem do backend no GHCR;
-- disponibilizar um compose de stack para subir `redis + evolution + backend`.
+- publicar imagens separadas de backend e frontend no GHCR;
+- disponibilizar um compose de stack para subir `frontend + backend + redis + evolution`.
 
 Arquivos principais:
 
 - [VERSION](/home/sidney/automacoes/saas/clinity/VERSION)
-- [.github/workflows/ci.yml](/home/sidney/automacoes/saas/clinity/.github/workflows/ci.yml)
-- [.github/workflows/release.yml](/home/sidney/automacoes/saas/clinity/.github/workflows/release.yml)
+- [.github/workflows/backend-ci.yml](/home/sidney/automacoes/saas/clinity/.github/workflows/backend-ci.yml)
+- [.github/workflows/frontend-ci.yml](/home/sidney/automacoes/saas/clinity/.github/workflows/frontend-ci.yml)
+- [.github/workflows/release-version.yml](/home/sidney/automacoes/saas/clinity/.github/workflows/release-version.yml)
+- [.github/workflows/backend-release.yml](/home/sidney/automacoes/saas/clinity/.github/workflows/backend-release.yml)
+- [.github/workflows/frontend-release.yml](/home/sidney/automacoes/saas/clinity/.github/workflows/frontend-release.yml)
 - [deploy/docker-compose.stack.yml](/home/sidney/automacoes/saas/clinity/deploy/docker-compose.stack.yml)
 
 ## Documentação Swagger e Postman

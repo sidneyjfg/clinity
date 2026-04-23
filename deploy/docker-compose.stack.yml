@@ -46,6 +46,16 @@ services:
     env_file:
       - ../infra/backend/.env
 
+  frontend:
+    image: ${FRONTEND_IMAGE}
+    container_name: clinity_frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_started
+    ports:
+      - "3000:3000"
+
 volumes:
   redis_data:
   evolution_instances:
