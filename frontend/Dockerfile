@@ -19,7 +19,7 @@ ENV NEXT_PUBLIC_APP_LAYER_LABEL=$NEXT_PUBLIC_APP_LAYER_LABEL
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json package-lock.json ./
-COPY next.config.mjs tsconfig.json next-env.d.ts eslint.config.mjs ./
+COPY next.config.mjs tsconfig.json next-env.d.ts eslint.config.mjs postcss.config.js tailwind.config.ts ./
 COPY app ./app
 COPY components ./components
 COPY lib ./lib
