@@ -3,9 +3,9 @@ import {
   ArrowRight,
   BadgeCheck,
   CalendarCheck2,
-  ChevronRight,
   Clock3,
   MessageSquareMore,
+  Percent,
   ShieldCheck
 } from "lucide-react";
 import Image from "next/image";
@@ -16,80 +16,80 @@ import { SectionHeading } from "@/components/app/section-heading";
 import { AppVersion } from "@/components/app/app-version";
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { clientLogos, pricingPlans, testimonials } from "@/lib/mock-data";
+import { clientLogos, marketplaceComparison, monetizationHighlights, testimonials } from "@/lib/mock-data";
 
 const problemPoints = [
-  "Pacientes esquecem a consulta e a equipe corre atrás em cima da hora.",
-  "Buracos na agenda reduzem faturamento e geram ociosidade da operação.",
-  "Recepção perde tempo confirmando, reagendando e atualizando status manualmente.",
-  "A clínica não enxerga com clareza onde o no-show nasce."
+  "Profissionais dependem de indicação, redes sociais e retorno manual para manter a agenda cheia.",
+  "Horários vazios reduzem faturamento mesmo quando há demanda procurando serviço perto.",
+  "O cliente quer encontrar, comparar e agendar sem precisar esperar atendimento.",
+  "Sem um canal de aquisição claro, o crescimento fica imprevisível."
 ];
 
 const solutionItems = [
   {
-    title: "Confirmações automáticas",
-    description: "Dispare confirmações e respostas rápidas por WhatsApp e e-mail sem depender da recepção."
+    title: "Marketplace para serviços locais",
+    description: "Barbearias, clínicas, salões e outros profissionais aparecem para clientes prontos para agendar."
   },
   {
-    title: "Follow-up orientado por contexto",
-    description: "Acione lembretes, reagendamento e recuperação de agenda com regras simples e visíveis."
+    title: "Geração de clientes com agendamento",
+    description: "A Hubly conecta demanda ao profissional e organiza o caminho até o horário confirmado."
   },
   {
-    title: "Visão única da operação",
-    description: "Centralize agenda, pacientes, métricas e automações num painel que sua equipe consegue usar."
+    title: "Operação simples para crescer",
+    description: "Agenda, confirmação e acompanhamento continuam claros, mas o foco é trazer novos clientes."
   }
 ];
 
 const benefits = [
   {
-    title: "Menos faltas",
-    description: "Sequências automáticas reduzem esquecimentos e melhoram a taxa de confirmação.",
+    title: "Novos clientes",
+    description: "Apareça para pessoas procurando serviços e transforme intenção em agendamento.",
     icon: CalendarCheck2
   },
   {
     title: "Mais previsibilidade",
-    description: "Saiba com antecedência onde a agenda vai furar e aja antes de perder receita.",
+    description: "Acompanhe demanda, horários ocupados e receita gerada pela plataforma.",
     icon: Activity
   },
   {
-    title: "Operação enxuta",
-    description: "Recepção focada no atendimento, não em tarefas repetitivas.",
+    title: "Sem cobrança inicial",
+    description: "Cresça seu faturamento antes de pagar qualquer coisa.",
     icon: Clock3
   },
   {
-    title: "Segurança para crescer",
-    description: "Estrutura pronta para perfis, clínica multiusuário e integração progressiva com backend real.",
+    title: "Controle do parceiro",
+    description: "Clientes próprios continuam seus, sem comissão do Hubly.",
     icon: ShieldCheck
   }
 ];
 
 const comparisons = [
-  { feature: "Confirmação automatizada", hubly: true, common: false },
-  { feature: "Lembretes em múltiplos momentos", hubly: true, common: false },
-  { feature: "Status operacional por consulta", hubly: true, common: false },
-  { feature: "Indicadores de no-show", hubly: true, common: false },
-  { feature: "Integração com Google Calendar", hubly: true, common: false },
-  { feature: "Agenda isolada sem contexto", hubly: false, common: true }
+  { feature: "Geração de novos clientes", hubly: true, common: false },
+  { feature: "Agendamento direto pelo cliente", hubly: true, common: false },
+  { feature: "Confirmação e lembretes", hubly: true, common: false },
+  { feature: "Indicadores de clientes gerados", hubly: true, common: false },
+  { feature: "Nenhuma comissão sobre clientes próprios", hubly: true, common: false },
+  { feature: "Apenas organização interna de horários", hubly: false, common: true }
 ];
 
 const steps = [
-  "Cadastre sua clínica, profissionais e pacientes.",
-  "Configure regras de confirmação, lembretes e follow-up.",
-  "Acompanhe agenda, faltas e receita em um dashboard claro."
+  "Entre como parceiro e publique seus serviços.",
+  "Receba agendamentos de clientes gerados pelo Hubly.",
+  "Pague comissão apenas quando a plataforma trouxer clientes."
 ];
 
 const faqs = [
   {
-    question: "A Hubly serve para qualquer tipo de organizationa?",
-    answer: "Sim. A interface foi pensada para operações médicas, odontológicas, estética, psicologia e serviços com agenda."
+    question: "A Hubly serve para quais profissionais?",
+    answer: "Para barbearias, clínicas, salões, estética, terapias e outros serviços que querem receber mais clientes com agendamento."
   },
   {
-    question: "Preciso instalar algo na clínica?",
-    answer: "Não. O frontend funciona como aplicação web e já está organizado para consumir um backend real quando você quiser plugar."
+    question: "Pago por clientes que eu mesmo trouxe?",
+    answer: "Não. A comissão vale apenas para clientes gerados pelo Hubly. Clientes próprios do profissional não entram nessa cobrança."
   },
   {
-    question: "Já existe integração real com WhatsApp ou Google Calendar?",
-    answer: "Nesta entrega, não. Tudo está simulado com dados mockados para validar UX, navegação e arquitetura."
+    question: "Existe mensalidade obrigatória para começar?",
+    answer: "Não. O começo é gratuito, e a cobrança acontece depois apenas quando a plataforma gera clientes para você."
   }
 ];
 
@@ -112,31 +112,31 @@ export default function MarketingPage() {
             <div>
               <div className="mb-6 inline-flex items-center gap-2 rounded-lg border border-sky-400/20 bg-sky-400/10 px-4 py-2 text-sm text-sky-200">
                 <BadgeCheck className="h-4 w-4" />
-                Agendamento inteligente para clínicas em crescimento
+                Marketplace para profissionais que querem crescer
               </div>
               <h1 className="max-w-3xl text-5xl font-semibold tracking-tight text-white md:text-7xl">
-                Menos faltas. Mais resultados.
+                Novos clientes para sua agenda.
               </h1>
               <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-300 md:text-xl">
-                A Hubly conecta sua organizationa aos melhores servicos para centralizar agenda, pacientes e automacoes sem perder clareza operacional.
+                A Hubly conecta pessoas procurando serviços a profissionais preparados para atender. Você cresce primeiro e paga apenas quando a plataforma gera clientes.
               </p>
               <div className="mt-10 flex flex-col gap-4 sm:flex-row">
                 <ButtonLink href="/login" size="lg">
-                  Agendar demonstração
+                  Começar grátis
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </ButtonLink>
                 <ButtonLink href="#como-funciona" size="lg" variant="secondary">
-                  Ver como funciona
+                  Receber meus primeiros clientes
                 </ButtonLink>
               </div>
               <div className="mt-10 flex flex-wrap gap-6 text-sm text-slate-400">
                 <div className="flex items-center gap-2">
                   <MessageSquareMore className="h-4 w-4 text-sky-300" />
-                  WhatsApp e e-mail simulados
+                  WhatsApp e e-mail para confirmação
                 </div>
                 <div className="flex items-center gap-2">
                   <CalendarCheck2 className="h-4 w-4 text-sky-300" />
-                  Google Calendar pronto para plugar
+                  Agendamentos com Google Calendar
                 </div>
               </div>
             </div>
@@ -158,11 +158,11 @@ export default function MarketingPage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-6 py-20 md:px-10" id="pricing">
+      <section className="mx-auto max-w-7xl px-6 py-20 md:px-10" id="problema">
         <SectionHeading
-          description="Se a agenda depende de confirmação manual, cada lacuna custa receita e desgaste operacional."
+          description="O profissional não precisa de mais uma promessa operacional. Precisa de clientes chegando com intenção de agendar."
           eyebrow="Problema"
-          title="O gargalo não está só na agenda. Está na rotina que sustenta a agenda."
+          title="O gargalo não é só organizar horários. É preencher a agenda."
         />
         <div className="mt-10 grid gap-4 md:grid-cols-2">
           {problemPoints.map((item) => (
@@ -176,9 +176,9 @@ export default function MarketingPage() {
       <section className="border-y border-white/10 bg-white/[0.02]">
         <div className="mx-auto max-w-7xl px-6 py-20 md:px-10">
           <SectionHeading
-            description="Automação, follow-up e status operacional ficam visíveis para a equipe sem criar complexidade."
+            description="A plataforma combina descoberta, agendamento e acompanhamento para transformar procura em atendimento."
             eyebrow="Solução"
-            title="A Hubly transforma confirmacao e reagendamento em fluxo, nao improviso."
+            title="A Hubly conecta clientes a profissionais locais."
           />
           <div className="mt-12 grid gap-6 lg:grid-cols-3">
             {solutionItems.map((item) => (
@@ -193,9 +193,9 @@ export default function MarketingPage() {
 
       <section className="mx-auto max-w-7xl px-6 py-20 md:px-10">
         <SectionHeading
-          description="Resultado operacional claro, sem interface pesada e sem esconder o que importa."
+          description="Você só paga quando o Hubly traz clientes. Sem risco, sem mensalidade inicial."
           eyebrow="Benefícios"
-          title="Uma experiência SaaS premium pensada para equipes de clínica."
+          title="Cresça seu faturamento antes de pagar qualquer coisa."
         />
         <div className="mt-12 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
           {benefits.map((item) => {
@@ -219,7 +219,7 @@ export default function MarketingPage() {
           <SectionHeading
             eyebrow="Comparação"
             title="Hubly versus agenda comum"
-            description="A diferença não é estética. É operacional."
+            description="A diferença é simples: agenda comum organiza horários; Hubly ajuda a trazer demanda."
           />
           <div className="mt-10 overflow-hidden rounded-xl border border-white/10">
             <div className="grid grid-cols-[1.4fr_0.8fr_0.8fr] bg-white/5 px-6 py-4 text-sm uppercase tracking-[0.18em] text-slate-400">
@@ -233,8 +233,8 @@ export default function MarketingPage() {
                 key={item.feature}
               >
                 <span>{item.feature}</span>
-                <span>{item.hubly ? "Sim" : "Nao"}</span>
-                <span>{item.common ? "Sim" : "Nao"}</span>
+                <span>{item.hubly ? "Sim" : "Não"}</span>
+                <span>{item.common ? "Sim" : "Não"}</span>
               </div>
             ))}
           </div>
@@ -244,8 +244,8 @@ export default function MarketingPage() {
       <section className="mx-auto max-w-7xl px-6 py-20 md:px-10" id="como-funciona">
         <SectionHeading
           eyebrow="Como Funciona"
-          title="Três passos para sair do operacional reativo"
-          description="Fluxo simples para começar com rapidez e evoluir depois para integração real."
+          title="Três passos para começar como parceiro"
+          description="Entre na plataforma, receba agendamentos e acompanhe os clientes gerados pelo Hubly."
         />
         <div className="mt-12 grid gap-6 md:grid-cols-3">
           {steps.map((step, index) => (
@@ -263,7 +263,7 @@ export default function MarketingPage() {
         <div className="mx-auto max-w-7xl px-6 py-20 md:px-10">
           <SectionHeading
             eyebrow="Depoimentos"
-            title="Quem opera agenda todos os dias percebe a diferença rápido."
+            title="Quem precisa crescer percebe a diferença rápido."
           />
           <div className="mt-12 grid gap-6 lg:grid-cols-3">
             {testimonials.map((testimonial) => (
@@ -281,34 +281,63 @@ export default function MarketingPage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-6 py-20 md:px-10">
+      <section className="mx-auto max-w-7xl px-6 py-20 md:px-10" id="pricing">
         <SectionHeading
-          eyebrow="Pricing"
-          title="Planos para começar agora e amadurecer depois"
-          description="Precificação simples para o MVP, com evolução natural para operações maiores."
+          eyebrow="Monetização"
+          title="Você só paga quando ganha clientes"
+          description="Comece grátis por um período inicial, como 30 dias ou os primeiros agendamentos. Depois, o Hubly cobra apenas 10% sobre clientes gerados pela plataforma."
         />
-        <div className="mt-12 grid gap-6 lg:grid-cols-3">
-          {pricingPlans.map((plan) => (
-            <Card
-              className={plan.highlighted ? "border-sky-400/25 bg-sky-400/10" : undefined}
-              key={plan.name}
-            >
-              <p className="text-sm uppercase tracking-[0.18em] text-slate-400">{plan.name}</p>
-              <p className="mt-5 text-4xl font-semibold text-white">{plan.price}</p>
-              <p className="mt-4 leading-7 text-slate-300">{plan.description}</p>
-              <div className="mt-8 space-y-3">
-                {plan.features.map((feature) => (
-                  <div className="flex items-start gap-3 text-sm text-slate-200" key={feature}>
-                    <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-sky-300" />
-                    {feature}
+        <div className="mt-12 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
+          <Card className="border-sky-400/25 bg-sky-400/10">
+            <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-sky-300 text-slate-950">
+              <Percent className="h-6 w-6" />
+            </div>
+            <p className="mt-8 text-5xl font-semibold text-white">10%</p>
+            <p className="mt-4 text-xl font-semibold text-white">sobre clientes gerados pela plataforma</p>
+            <p className="mt-4 leading-7 text-slate-200">
+              Você só paga quando recebe novos clientes. Nenhuma cobrança sobre clientes próprios do profissional.
+            </p>
+            <p className="mt-4 rounded-lg border border-white/10 bg-white/5 p-4 text-sm leading-6 text-slate-300">
+              Os pagamentos são processados por plataformas seguras de pagamento. Taxas de processamento seguem o padrão do mercado e são aplicadas automaticamente.
+            </p>
+            <ButtonLink className="mt-8 w-full" href="/login">
+              Entrar como parceiro
+            </ButtonLink>
+          </Card>
+
+          <div className="grid gap-6">
+            <div className="grid gap-6 md:grid-cols-3">
+              {monetizationHighlights.map((item) => (
+                <Card className="bg-panelAlt/80" key={item.title}>
+                  <p className="text-lg font-semibold text-white">{item.title}</p>
+                  <p className="mt-3 text-sm leading-7 text-slate-300">{item.description}</p>
+                </Card>
+              ))}
+            </div>
+
+            <Card>
+              <p className="text-xl font-semibold text-white">Taxa baixa para crescimento sustentável</p>
+              <p className="mt-4 leading-7 text-slate-300">
+                Plataformas como Uber e iFood cobram entre 15% e 30% por pedido, dependendo do modelo e serviços oferecidos. O Hubly cobra apenas 10% sobre clientes gerados pela plataforma, para o profissional crescer antes de pagar.
+              </p>
+              <div className="mt-8 grid gap-4 md:grid-cols-3">
+                {marketplaceComparison.map((item) => (
+                  <div
+                    className={`rounded-lg border p-5 ${
+                      item.highlighted
+                        ? "border-sky-400/30 bg-sky-400/10"
+                        : "border-white/10 bg-white/[0.03]"
+                    }`}
+                    key={item.name}
+                  >
+                    <p className="text-sm font-medium text-slate-300">{item.name}</p>
+                    <p className="mt-3 text-3xl font-semibold text-white">{item.rate}</p>
+                    <p className="mt-3 text-sm leading-6 text-slate-400">{item.description}</p>
                   </div>
                 ))}
               </div>
-              <ButtonLink className="mt-8 w-full" href="/login" variant={plan.highlighted ? "primary" : "secondary"}>
-                {plan.cta}
-              </ButtonLink>
             </Card>
-          ))}
+          </div>
         </div>
       </section>
 
@@ -332,14 +361,14 @@ export default function MarketingPage() {
             <div>
               <p className="text-sm uppercase tracking-[0.18em] text-sky-300">Pronto para produto real</p>
               <h2 className="mt-4 text-4xl font-semibold tracking-tight text-white">
-                Comece a reduzir faltas hoje.
+                Receba seus primeiros clientes pelo Hubly.
               </h2>
               <p className="mt-4 max-w-2xl text-lg leading-8 text-slate-300">
-                Interface premium, identidade alinhada com a nova marca e arquitetura frontend preparada para conectar ao backend sem retrabalho.
+                Sem mensalidade inicial. Você só paga quando a plataforma gera clientes para o seu negócio.
               </p>
             </div>
             <ButtonLink href="/login" size="lg">
-              Abrir demonstração
+              Começar grátis
             </ButtonLink>
           </div>
         </Card>
@@ -362,12 +391,12 @@ export default function MarketingPage() {
         <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-10 text-sm text-slate-400 md:flex-row md:items-center md:justify-between md:px-10">
           <div>
             <p className="font-medium text-white">Hubly</p>
-            <p className="mt-2">Conecta voce aos melhores servicos para uma agenda mais previsivel e com menos no-show.</p>
+            <p className="mt-2">Marketplace que conecta clientes a profissionais locais com agendamento simples.</p>
           </div>
           <div className="flex flex-col items-start gap-4 md:items-end">
             <div className="flex flex-wrap gap-6">
-              <a href="#como-funciona">Produto</a>
-              <a href="#pricing">Planos</a>
+              <a href="#como-funciona">Como funciona</a>
+              <a href="#pricing">Monetização</a>
               <a href="/login">Entrar</a>
               <a href="#">Privacidade</a>
               <a href="#">Suporte</a>

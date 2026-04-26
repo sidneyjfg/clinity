@@ -1,4 +1,4 @@
-import type { PricingPlan, Testimonial } from "@/lib/types";
+import type { MarketplaceComparison, MonetizationHighlight, Testimonial } from "@/lib/types";
 
 export const clientLogos = ["Vitta Prime", "Oriz", "Pulse Care", "Harmonie", "Clarear"];
 
@@ -23,44 +23,36 @@ export const testimonials: Testimonial[] = [
   }
 ];
 
-export const pricingPlans: PricingPlan[] = [
+export const monetizationHighlights: MonetizationHighlight[] = [
   {
-    name: "Starter",
-    price: "R$ 149",
-    description: "Para clínicas iniciando a automação da agenda.",
-    features: [
-      "Agenda diária e semanal",
-      "Confirmação automática",
-      "Cadastro de pacientes",
-      "Relatórios essenciais"
-    ],
-    cta: "Começar agora"
+    title: "Comece sem risco",
+    description: "Periodo inicial gratuito para validar a plataforma antes de pagar qualquer coisa."
   },
   {
-    name: "Growth",
-    price: "R$ 289",
-    description: "Mais controle para reduzir faltas e escalar atendimento.",
-    features: [
-      "Tudo do Starter",
-      "Lembretes 24h e 2h",
-      "Playbooks de follow-up",
-      "Dashboard operacional avançado",
-      "Integração básica com Google Calendar"
-    ],
-    highlighted: true,
-    cta: "Escolher Growth"
+    title: "10% sobre clientes gerados",
+    description: "Depois do periodo gratuito, a taxa incide apenas quando o Hubly traz um novo cliente."
   },
   {
-    name: "Custom",
-    price: "Sob consulta",
-    description: "Fluxos sob medida para operações multiunidade.",
-    features: [
-      "Tudo do Growth",
-      "Setup assistido",
-      "Mapeamento operacional",
-      "Governança por perfis",
-      "Suporte prioritário"
-    ],
-    cta: "Falar com especialista"
+    title: "Clientes próprios ficam fora",
+    description: "Nenhuma cobrança sobre clientes que já eram seus ou chegaram por canais próprios."
+  }
+];
+
+export const marketplaceComparison: MarketplaceComparison[] = [
+  {
+    name: "Marketplaces tradicionais",
+    rate: "15% a 30%",
+    description: "Comissões comuns em plataformas com intermediação, visibilidade e demanda."
+  },
+  {
+    name: "iFood",
+    rate: "12% a 23%",
+    description: "Pode variar conforme modelo, categoria, serviços e entrega."
+  },
+  {
+    name: "Hubly",
+    rate: "10%",
+    description: "Foco em crescimento sustentável para o profissional parceiro.",
+    highlighted: true
   }
 ];

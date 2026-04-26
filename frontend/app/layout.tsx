@@ -5,7 +5,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Hubly",
-  description: "Hub de agendamento inteligente para organizationas com foco em reduzir no-show e dar previsibilidade operacional."
+  description: "Marketplace de serviços que conecta clientes a profissionais locais com agendamento simples e cobrança por clientes gerados."
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

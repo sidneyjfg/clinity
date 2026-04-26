@@ -16,8 +16,6 @@ export type BookingStatus = (typeof bookingStatuses)[number];
 
 export type CustomerStatus = "active" | "pending" | "returning";
 
-export type PlanName = "Starter" | "Growth" | "Scale";
-
 export type FakeUser = {
   id: string;
   organizationId: string;
@@ -181,11 +179,14 @@ export type Testimonial = {
   quote: string;
 };
 
-export type PricingPlan = {
-  name: PlanName | "Custom";
-  price: string;
+export type MonetizationHighlight = {
+  title: string;
   description: string;
-  features: string[];
+};
+
+export type MarketplaceComparison = {
+  name: string;
+  rate: string;
+  description: string;
   highlighted?: boolean;
-  cta: string;
 };
