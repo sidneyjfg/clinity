@@ -58,6 +58,16 @@ export function formatTimeLabel(value: string): string {
   }).format(new Date(value));
 }
 
+export function formatDateTimeLabel(value: string): string {
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  }).format(new Date(value));
+}
+
 export function formatDateTimeLocalInput(value: Date): string {
   const year = value.getFullYear();
   const month = String(value.getMonth() + 1).padStart(2, "0");

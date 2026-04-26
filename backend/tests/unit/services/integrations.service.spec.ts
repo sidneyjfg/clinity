@@ -30,9 +30,12 @@ describe("IntegrationsService", () => {
           status: "created",
         },
       }),
-      getStatus: vi.fn().mockResolvedValue({
-        state: "connecting",
-      }),
+      setPairingCodeMode: vi.fn().mockResolvedValue(undefined),
+      getStatus: vi.fn()
+        .mockRejectedValueOnce(new Error("not found"))
+        .mockResolvedValue({
+          state: "connecting",
+        }),
       connect: vi.fn(),
       sendText: vi.fn(),
       list: vi.fn(),
@@ -54,6 +57,7 @@ describe("IntegrationsService", () => {
 
     expect(result.state).toBe("connecting");
     expect(evolutionWhatsAppService.createInstance).toHaveBeenCalledWith("organization-cln_main_001");
+    expect(evolutionWhatsAppService.setPairingCodeMode).toHaveBeenCalledWith("organization-cln_main_001");
     expect(evolutionWhatsAppService.getStatus).toHaveBeenCalledWith("organization-cln_main_001");
 
     const integration = await new OrganizationIntegrationsRepository(dataSource).findByOrganizationAndChannel(

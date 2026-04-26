@@ -10,13 +10,14 @@ const publicRoutes = new Set([
   "/v1/auth/sign-up",
   "/v1/auth/refresh",
   "/v1/auth/forgot-password",
+  "/v1/system-admin/auth/sign-in",
 ]);
 
 export const authMiddleware = async (request: FastifyRequest, _reply: FastifyReply): Promise<void> => {
   const requestPath = request.url.split("?")[0] ?? request.url;
   const route = request.routeOptions.url ?? requestPath;
 
-  if (publicRoutes.has(route) || route.startsWith("/v1/public/") || isApiDocsRoute(route)) {
+  if (publicRoutes.has(route) || route.startsWith("/v1/public/") || route.startsWith("/v1/system-admin/") || isApiDocsRoute(route)) {
     return;
   }
 

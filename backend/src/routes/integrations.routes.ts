@@ -7,7 +7,6 @@ import {
   whatsappRegenerateCodeRouteSchema,
   whatsappDisconnectRouteSchema,
   whatsappSessionStartRouteSchema,
-  whatsappConnectRouteSchema,
   whatsappSendTextRouteSchema,
   whatsappStatusRouteSchema,
 } from "../docs/route-schemas";
@@ -51,15 +50,6 @@ export const integrationsRoutes = async (
       schema: whatsappStatusRouteSchema,
     },
     integrationsController.whatsappStatus,
-  );
-
-  app.get(
-    "/integrations/whatsapp/connect",
-    {
-      preHandler: allowRoles(["administrator", "reception"]),
-      schema: whatsappConnectRouteSchema,
-    },
-    integrationsController.whatsappConnect,
   );
 
   app.post(

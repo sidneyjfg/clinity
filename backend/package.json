@@ -8,6 +8,7 @@
     "start": "node dist/main.js",
     "check": "tsc -p tsconfig.build.json --noEmit",
     "docs:export": "tsx src/scripts/export-api-docs.ts",
+    "hash:password": "tsx src/scripts/hash-password.ts",
     "db:migrate": "tsx src/database/migrations/run-migrations.ts",
     "db:seed": "tsx src/database/seeds/run-seed.ts",
     "test": "vitest run",

@@ -5,7 +5,6 @@ import { OrganizationIntegrationsRepository } from "../repositories/organization
 import type { AuthenticatedRequestUser } from "../types/auth";
 import type {
   IntegrationSummary,
-  WhatsAppConnectCode,
   WhatsAppConnectionStatus,
   WhatsAppDisconnectResult,
   WhatsAppSessionConnectResult,
@@ -25,6 +24,18 @@ const connectedWhatsAppStates = new Set(["open", "connected"]);
 
 function isWhatsAppConnected(state: string | null | undefined): boolean {
   return connectedWhatsAppStates.has((state ?? "").toLowerCase());
+}
+
+function ensurePairingCodeReturned(connectResult: { pairingCode?: string; code?: string }): void {
+  if (connectResult.pairingCode || connectResult.code) {
+    return;
+  }
+
+  throw new AppError(
+    "whatsapp.pairing_code_not_returned",
+    "A Evolution API não retornou código de pareamento. Verifique se a instância antiga foi removida e se QR code está desativado.",
+    502,
+  );
 }
 
 export class IntegrationsService {
@@ -48,11 +59,6 @@ export class IntegrationsService {
       ...status,
       phoneNumber: integration.phoneNumber,
     };
-  }
-
-  public async connectWhatsApp(user: AuthenticatedRequestUser, number?: string): Promise<WhatsAppConnectCode> {
-    const integration = await this.ensureWhatsAppIntegration(user);
-    return this.evolutionWhatsAppService.connect(integration.instanceName, number);
   }
 
   public async disconnectWhatsApp(user: AuthenticatedRequestUser): Promise<WhatsAppDisconnectResult> {
@@ -95,7 +101,11 @@ export class IntegrationsService {
       );
     }
 
+    await this.evolutionWhatsAppService.setPairingCodeMode(integration.instanceName);
+
     const connectResult = await this.evolutionWhatsAppService.connect(integration.instanceName, data.phoneNumber);
+    ensurePairingCodeReturned(connectResult);
+
     const status = await this.evolutionWhatsAppService.getStatus(integration.instanceName);
 
     await this.organizationIntegrationsRepository.updateStatus(integration.id, status.state);
@@ -136,8 +146,11 @@ export class IntegrationsService {
     }
 
     await this.evolutionWhatsAppService.restartInstance(integration.instanceName);
+    await this.evolutionWhatsAppService.setPairingCodeMode(integration.instanceName);
 
     const connectResult = await this.evolutionWhatsAppService.connect(integration.instanceName, data.phoneNumber);
+    ensurePairingCodeReturned(connectResult);
+
     const status = await this.evolutionWhatsAppService.getStatus(integration.instanceName);
 
     await this.organizationIntegrationsRepository.updateStatus(integration.id, status.state);
@@ -186,14 +199,19 @@ export class IntegrationsService {
         return currentIntegration;
       }
 
-      const createdInstance = await this.evolutionWhatsAppService.createInstance(instanceName);
+      const existingStatus = await this.findExistingWhatsAppInstanceState(instanceName);
+      const createdInstance = existingStatus ? null : await this.evolutionWhatsAppService.createInstance(instanceName);
+      const resolvedInstanceName = createdInstance?.instance?.instanceName ?? instanceName;
+
+      await this.evolutionWhatsAppService.setPairingCodeMode(resolvedInstanceName);
+
       const integration = await this.organizationIntegrationsRepository.create(
         {
           organizationId: user.organizationId,
           channel: "whatsapp",
           provider: "evolution",
-          instanceName: createdInstance.instance?.instanceName ?? instanceName,
-          status: createdInstance.instance?.status ?? "created",
+          instanceName: resolvedInstanceName,
+          status: existingStatus ?? createdInstance?.instance?.status ?? "created",
         },
         manager,
       );
@@ -215,5 +233,14 @@ export class IntegrationsService {
 
   private buildInstanceName(organizationId: string): string {
     return `organization-${organizationId}`;
+  }
+
+  private async findExistingWhatsAppInstanceState(instanceName: string): Promise<string | null> {
+    try {
+      const status = await this.evolutionWhatsAppService.getStatus(instanceName);
+      return status.state ?? "created";
+    } catch {
+      return null;
+    }
   }
 }

@@ -17,10 +17,12 @@ import { customersRoutes } from "./customers.routes";
 import { providerServicesRoutes } from "./service-offerings.routes";
 import { providersRoutes } from "./providers.routes";
 import { reportsRoutes } from "./reports.routes";
+import { systemAdminRoutes } from "./system-admin.routes";
 
 const routeRegistry = [
   healthRoutes,
   publicBookingsRoutes,
+  systemAdminRoutes,
   authRoutes,
   organizationsRoutes,
   providersRoutes,

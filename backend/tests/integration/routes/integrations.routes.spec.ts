@@ -80,6 +80,10 @@ describe("Integrations routes", () => {
       })
       .mockResolvedValueOnce({
         ok: true,
+        text: async () => JSON.stringify({}),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
         text: async () =>
           JSON.stringify({
             instance: {
@@ -108,6 +112,13 @@ describe("Integrations routes", () => {
     );
     expect(global.fetch).toHaveBeenNthCalledWith(
       2,
+      "http://evolution.local/settings/set/organization-cln_main_001",
+      expect.objectContaining({
+        method: "POST",
+      }),
+    );
+    expect(global.fetch).toHaveBeenNthCalledWith(
+      3,
       "http://evolution.local/instance/connectionState/organization-cln_main_001",
       expect.objectContaining({
         method: "GET",
@@ -129,6 +140,10 @@ describe("Integrations routes", () => {
               status: "created",
             },
           }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify({}),
       })
       .mockResolvedValueOnce({
         ok: true,
@@ -167,6 +182,10 @@ describe("Integrations routes", () => {
               status: "created",
             },
           }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify({}),
       })
       .mockResolvedValueOnce({
         ok: true,
@@ -217,6 +236,10 @@ describe("Integrations routes", () => {
       })
       .mockResolvedValueOnce({
         ok: true,
+        text: async () => JSON.stringify({}),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
         text: async () =>
           JSON.stringify({
             instance: {
@@ -224,6 +247,10 @@ describe("Integrations routes", () => {
               state: "close",
             },
           }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify({}),
       })
       .mockResolvedValueOnce({
         ok: true,
@@ -286,6 +313,10 @@ describe("Integrations routes", () => {
       })
       .mockResolvedValueOnce({
         ok: true,
+        text: async () => JSON.stringify({}),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
         text: async () =>
           JSON.stringify({
             instance: {
@@ -330,6 +361,10 @@ describe("Integrations routes", () => {
       })
       .mockResolvedValueOnce({
         ok: true,
+        text: async () => JSON.stringify({}),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
         text: async () =>
           JSON.stringify({
             instance: {
@@ -362,7 +397,7 @@ describe("Integrations routes", () => {
     });
     expect(response.json().instanceName).toBeUndefined();
     expect(global.fetch).toHaveBeenNthCalledWith(
-      3,
+      4,
       "http://evolution.local/instance/logout/organization-cln_main_001",
       expect.objectContaining({
         method: "DELETE",
@@ -387,6 +422,10 @@ describe("Integrations routes", () => {
       })
       .mockResolvedValueOnce({
         ok: true,
+        text: async () => JSON.stringify({}),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
         text: async () =>
           JSON.stringify({
             instance: {
@@ -399,6 +438,10 @@ describe("Integrations routes", () => {
         ok: true,
         text: async () =>
           JSON.stringify({}),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify({}),
       })
       .mockResolvedValueOnce({
         ok: true,
@@ -432,10 +475,10 @@ describe("Integrations routes", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json().pairingCode).toBe("NEWCODE99");
     expect(global.fetch).toHaveBeenNthCalledWith(
-      3,
+      4,
       "http://evolution.local/instance/restart/organization-cln_main_001",
       expect.objectContaining({
-        method: "PUT",
+        method: "POST",
       }),
     );
   });

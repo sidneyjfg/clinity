@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, CalendarDays, MapPin, Search, ShieldCheck, Sparkles, Stethoscope } from "lucide-react";
 
@@ -10,13 +11,38 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
 
+function normalizeSearchValue(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
 export default function CustomerMarketplacePage() {
+  const [searchTerm, setSearchTerm] = useState("");
   const organizationsQuery = useQuery({
     queryKey: ["public-organizations"],
     queryFn: api.listPublicOrganizations
   });
 
   const organizations = organizationsQuery.data?.items ?? [];
+  const normalizedSearchTerm = normalizeSearchValue(searchTerm);
+  const filteredOrganizations = normalizedSearchTerm
+    ? organizations.filter((organization) => {
+        const searchableText = normalizeSearchValue([
+          organization.tradeName,
+          organization.publicDescription,
+          organization.city,
+          organization.district,
+          organization.state,
+          ...organization.providers.map((provider) => provider.specialty),
+          ...organization.serviceOfferings.map((service) => service.name)
+        ].filter(Boolean).join(" "));
+
+        return searchableText.includes(normalizedSearchTerm);
+      })
+    : organizations;
 
   return (
     <main className="min-h-screen bg-background">
@@ -69,9 +95,14 @@ export default function CustomerMarketplacePage() {
             <Search className="h-5 w-5 text-sky-300" />
             <h2 className="text-xl font-semibold text-white">Estabelecimentos disponíveis</h2>
           </div>
-          <Input className="mt-5" placeholder="Buscar por clínica, cidade ou especialidade" />
+          <Input
+            className="mt-5"
+            onChange={(event) => setSearchTerm(event.target.value)}
+            placeholder="Buscar por clínica, cidade ou especialidade"
+            value={searchTerm}
+          />
           <div className="mt-5 grid gap-4">
-            {organizations.map((organization) => (
+            {filteredOrganizations.map((organization) => (
               <Link
                 className="grid overflow-hidden rounded-lg border border-white/10 bg-white/5 transition hover:border-sky-300/40 hover:bg-white/8 md:grid-cols-[180px_1fr]"
                 href={`/clientes/${organization.bookingPageSlug}`}
@@ -116,6 +147,11 @@ export default function CustomerMarketplacePage() {
             {organizations.length === 0 ? (
               <div className="rounded-lg border border-white/10 bg-white/5 p-5 text-sm text-slate-300">
                 Nenhum estabelecimento publicado no momento.
+              </div>
+            ) : null}
+            {organizations.length > 0 && filteredOrganizations.length === 0 ? (
+              <div className="rounded-lg border border-white/10 bg-white/5 p-5 text-sm text-slate-300">
+                Nenhum estabelecimento encontrado para essa busca.
               </div>
             ) : null}
           </div>

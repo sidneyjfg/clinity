@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, RefreshCw, Trash2 } from "lucide-react";
 
 import { api } from "@/lib/api";
 import { Toggle } from "@/components/ui/toggle";
@@ -144,6 +144,17 @@ export default function AutomationsPage() {
     }
   });
 
+  const regenerateCodeMutation = useMutation({
+    mutationFn: () => api.regenerateWhatsAppCode(phoneNumber),
+    meta: {
+      errorMessage: "Código não regenerado",
+      successMessage: "Novo código gerado com sucesso"
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["automation-settings"] });
+    }
+  });
+
   const processMutation = useMutation({
     mutationFn: () => api.processDueWhatsApp(25),
     meta: {
@@ -197,7 +208,9 @@ export default function AutomationsPage() {
   }
 
   const integration = data?.integrations[0];
-  const connectedPhoneNumber = data?.status?.phoneNumber ?? integration?.phoneNumber ?? sessionMutation.data?.phoneNumber;
+  const latestSessionResult = regenerateCodeMutation.data ?? sessionMutation.data;
+  const isCodeRequestPending = sessionMutation.isPending || regenerateCodeMutation.isPending;
+  const connectedPhoneNumber = data?.status?.phoneNumber ?? integration?.phoneNumber ?? latestSessionResult?.phoneNumber;
   const statusView = getWhatsAppStatusView({
     backendEnabled: integration?.enabled,
     state: data?.status?.state ?? integration?.status,
@@ -319,17 +332,23 @@ export default function AutomationsPage() {
                 <p className="mb-2 text-sm text-slate-400">Número para pareamento</p>
                 <Input onChange={(event) => setPhoneNumber(event.target.value)} value={phoneNumber} />
               </div>
-              <Button disabled={sessionMutation.isPending} onClick={() => sessionMutation.mutate()}>
-                Gerar código
-              </Button>
+              <div className="flex flex-wrap gap-3">
+                <Button disabled={isCodeRequestPending} onClick={() => sessionMutation.mutate()}>
+                  Gerar código
+                </Button>
+                <Button disabled={isCodeRequestPending} onClick={() => regenerateCodeMutation.mutate()} variant="secondary">
+                  <RefreshCw className="h-4 w-4" />
+                  Regerar código
+                </Button>
+              </div>
             </>
           )}
         </div>
-        {!statusView.isConnected && sessionMutation.data ? (
+        {!statusView.isConnected && latestSessionResult ? (
           <div className="mt-6 rounded-xl border border-sky-400/20 bg-sky-400/10 p-4">
             <p className="text-sm text-slate-300">Código de conexão</p>
             <p className="mt-2 text-2xl font-semibold tracking-[0.2em] text-white">
-              {sessionMutation.data.pairingCode ?? sessionMutation.data.code ?? "Aguardando retorno"}
+              {latestSessionResult.pairingCode ?? latestSessionResult.code ?? "Aguardando retorno"}
             </p>
           </div>
         ) : null}
@@ -345,6 +364,7 @@ export default function AutomationsPage() {
       </div>
       {saveMutation.error ? <p className="text-sm text-rose-300">{saveMutation.error.message}</p> : null}
       {sessionMutation.error ? <p className="text-sm text-rose-300">{sessionMutation.error.message}</p> : null}
+      {regenerateCodeMutation.error ? <p className="text-sm text-rose-300">{regenerateCodeMutation.error.message}</p> : null}
       {processMutation.error ? <p className="text-sm text-rose-300">{processMutation.error.message}</p> : null}
       {disconnectMutation.error ? <p className="text-sm text-rose-300">{disconnectMutation.error.message}</p> : null}
 

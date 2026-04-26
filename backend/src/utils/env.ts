@@ -13,6 +13,10 @@ type Env = {
   DB_LOGGING: boolean;
   JWT_ACCESS_SECRET: string;
   JWT_REFRESH_SECRET: string;
+  SYSTEM_ADMIN_JWT_SECRET: string;
+  SYSTEM_ADMIN_EMAIL: string;
+  SYSTEM_ADMIN_PASSWORD_HASH: string;
+  SYSTEM_ADMIN_ACCESS_EXPIRES_IN: string;
   JWT_ACCESS_EXPIRES_IN: string;
   JWT_REFRESH_EXPIRES_IN: string;
   LOGIN_RATE_LIMIT_WINDOW_MS: number;
@@ -87,6 +91,10 @@ export const env: Env = {
   DB_LOGGING: parseBoolean(process.env.DB_LOGGING, false),
   JWT_ACCESS_SECRET: process.env.JWT_ACCESS_SECRET ?? "change-access-secret",
   JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET ?? "change-refresh-secret",
+  SYSTEM_ADMIN_JWT_SECRET: process.env.SYSTEM_ADMIN_JWT_SECRET ?? "change-system-admin-secret",
+  SYSTEM_ADMIN_EMAIL: process.env.SYSTEM_ADMIN_EMAIL ?? "owner@hubly.local",
+  SYSTEM_ADMIN_PASSWORD_HASH: process.env.SYSTEM_ADMIN_PASSWORD_HASH ?? "",
+  SYSTEM_ADMIN_ACCESS_EXPIRES_IN: process.env.SYSTEM_ADMIN_ACCESS_EXPIRES_IN ?? "10m",
   JWT_ACCESS_EXPIRES_IN: process.env.JWT_ACCESS_EXPIRES_IN ?? "15m",
   JWT_REFRESH_EXPIRES_IN: process.env.JWT_REFRESH_EXPIRES_IN ?? "7d",
   LOGIN_RATE_LIMIT_WINDOW_MS: parsePort(process.env.LOGIN_RATE_LIMIT_WINDOW_MS ?? "60000"),

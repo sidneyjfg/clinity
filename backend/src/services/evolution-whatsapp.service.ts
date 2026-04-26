@@ -14,6 +14,8 @@ import { env } from "../utils/env";
 
 type FetchFn = (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => Promise<Response>;
 
+type UnknownRecord = Record<string, unknown>;
+
 const sendTextSchema = z.object({
   number: z.string().min(10).max(30),
   text: z.string().min(1).max(4096),
@@ -49,6 +51,66 @@ const readConfig = () => ({
   instance: process.env.WHATSAPP_EVOLUTION_INSTANCE ?? "",
   timeoutMs: parseInteger(process.env.WHATSAPP_EVOLUTION_TIMEOUT_MS, 10_000),
 });
+
+function isRecord(value: unknown): value is UnknownRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function findStringValue(value: unknown, keys: string[]): string | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  for (const key of keys) {
+    const currentValue = value[key];
+    if (typeof currentValue === "string" && currentValue.trim().length > 0) {
+      return currentValue;
+    }
+  }
+
+  for (const currentValue of Object.values(value)) {
+    const nestedValue = findStringValue(currentValue, keys);
+    if (nestedValue) {
+      return nestedValue;
+    }
+  }
+
+  return undefined;
+}
+
+function findNumberValue(value: unknown, keys: string[]): number | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  for (const key of keys) {
+    const currentValue = value[key];
+    if (typeof currentValue === "number" && Number.isFinite(currentValue)) {
+      return currentValue;
+    }
+  }
+
+  for (const currentValue of Object.values(value)) {
+    const nestedValue = findNumberValue(currentValue, keys);
+    if (nestedValue !== undefined) {
+      return nestedValue;
+    }
+  }
+
+  return undefined;
+}
+
+function normalizeConnectCode(payload: unknown): WhatsAppConnectCode {
+  const pairingCode = findStringValue(payload, ["pairingCode", "pairing_code", "pairing"]);
+  const code = findStringValue(payload, ["code"]);
+  const count = findNumberValue(payload, ["count"]);
+
+  return {
+    ...(pairingCode === undefined ? {} : { pairingCode }),
+    ...(code === undefined ? {} : { code }),
+    ...(count === undefined ? {} : { count }),
+  };
+}
 
 export class EvolutionWhatsAppService {
   public constructor(
@@ -87,12 +149,14 @@ export class EvolutionWhatsAppService {
   public async connect(instanceName: string, number?: string): Promise<WhatsAppConnectCode> {
     const queryString = number ? `?number=${encodeURIComponent(number)}` : "";
 
-    return this.request<WhatsAppConnectCode>(
+    const payload = await this.request<unknown>(
       `/instance/connect/${instanceName}${queryString}`,
       {
         method: "GET",
       },
     );
+
+    return normalizeConnectCode(payload);
   }
 
   public async createInstance(instanceName: string): Promise<WhatsAppInstanceCreateResult> {
@@ -107,6 +171,36 @@ export class EvolutionWhatsAppService {
           instanceName,
           integration: "WHATSAPP-BAILEYS",
           qrcode: false,
+          qrCode: false,
+          pairingCode: true,
+          rejectCall: true,
+          msgCall: "",
+          groupsIgnore: true,
+          alwaysOnline: false,
+          readMessages: false,
+          readStatus: false,
+          syncFullHistory: false,
+        }),
+      },
+    );
+  }
+
+  public async setPairingCodeMode(instanceName: string): Promise<void> {
+    await this.request<Record<string, unknown>>(
+      `/settings/set/${instanceName}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          rejectCall: true,
+          msgCall: "",
+          groupsIgnore: true,
+          alwaysOnline: false,
+          readMessages: false,
+          readStatus: false,
+          syncFullHistory: false,
         }),
       },
     );
@@ -116,7 +210,7 @@ export class EvolutionWhatsAppService {
     await this.request<Record<string, unknown>>(
       `/instance/restart/${instanceName}`,
       {
-        method: "PUT",
+        method: "POST",
       },
     );
   }

@@ -44,6 +44,37 @@ export class AuditRepository {
     })), total, pagination);
   }
 
+  public async findAllForSystemAdmin(
+    pagination: Pagination,
+    filters: { organizationId?: string; action?: string } = {},
+  ): Promise<PaginatedResult<AuditEvent>> {
+    const queryBuilder = this.getRepository()
+      .createQueryBuilder("audit")
+      .orderBy("audit.occurredAt", "DESC")
+      .skip(getPaginationOffset(pagination))
+      .take(pagination.limit);
+
+    if (filters.organizationId) {
+      queryBuilder.andWhere("audit.organizationId = :organizationId", { organizationId: filters.organizationId });
+    }
+
+    if (filters.action) {
+      queryBuilder.andWhere("audit.action LIKE :action", { action: `%${filters.action}%` });
+    }
+
+    const [items, total] = await queryBuilder.getManyAndCount();
+
+    return buildPaginatedResult(items.map((item) => ({
+      id: item.id,
+      organizationId: item.organizationId,
+      actorId: item.actorId ?? "",
+      action: item.action,
+      targetType: item.targetType,
+      targetId: item.targetId,
+      occurredAt: item.occurredAt.toISOString(),
+    })), total, pagination);
+  }
+
   public async create(input: AuditCreateInput, manager?: EntityManager): Promise<void> {
     await this.getRepository(manager).save({
       id: randomUUID(),

@@ -48,12 +48,20 @@ export const getRedisClient = async (): Promise<RedisClientType | null> => {
       connectTimeout: config.connectTimeoutMs,
     },
   });
+  client.on("error", () => undefined);
 
-  connectPromise = client.connect().then(() => client as RedisClientType).finally(() => {
-    connectPromise = null;
-  });
+  connectPromise = client.connect()
+    .then(() => client as RedisClientType)
+    .catch(() => {
+      client = null;
+      return null as unknown as RedisClientType;
+    })
+    .finally(() => {
+      connectPromise = null;
+    });
 
-  return connectPromise;
+  const connectedClient = await connectPromise;
+  return connectedClient?.isOpen ? connectedClient : null;
 };
 
 export const closeRedisClient = async (): Promise<void> => {

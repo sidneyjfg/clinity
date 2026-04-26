@@ -473,16 +473,6 @@ const whatsappStatusSchema = {
   },
 } as const;
 
-const whatsappConnectSchema = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    pairingCode: { type: "string" },
-    code: { type: "string" },
-    count: { type: "number" },
-  },
-} as const;
-
 const whatsappSessionRequestSchema = {
   type: "object",
   additionalProperties: false,
@@ -1246,19 +1236,6 @@ export const whatsappStatusRouteSchema = {
   },
 } satisfies FastifySchema;
 
-export const whatsappConnectRouteSchema = {
-  ...protectedRouteSchemaBase,
-  tags: ["Integrations"],
-  summary: "WhatsApp connect code",
-  description: "Requests a QR or pairing code from the Evolution API instance.",
-  response: {
-    ...protectedRouteSchemaBase.response,
-    200: whatsappConnectSchema,
-    502: errorResponseSchema,
-    503: errorResponseSchema,
-  },
-} satisfies FastifySchema;
-
 export const whatsappSendTextRouteSchema = {
   ...protectedRouteSchemaBase,
   tags: ["Integrations"],
@@ -1277,7 +1254,7 @@ export const whatsappSessionStartRouteSchema = {
   ...protectedRouteSchemaBase,
   tags: ["Integrations"],
   summary: "Start WhatsApp session",
-  description: "Creates or reuses the organization instance and requests a connection code for the informed phone number.",
+  description: "Creates or reuses the organization instance and requests a phone-number pairing code. QR code login is intentionally disabled.",
   body: whatsappSessionRequestSchema,
   response: {
     ...protectedRouteSchemaBase.response,
@@ -1291,7 +1268,7 @@ export const whatsappRegenerateCodeRouteSchema = {
   ...protectedRouteSchemaBase,
   tags: ["Integrations"],
   summary: "Regenerate WhatsApp code",
-  description: "Restarts the organization instance and requests a fresh connection code for the informed phone number.",
+  description: "Restarts the organization instance and requests a fresh phone-number pairing code. QR code login is intentionally disabled.",
   body: whatsappSessionRequestSchema,
   response: {
     ...protectedRouteSchemaBase.response,

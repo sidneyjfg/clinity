@@ -67,7 +67,6 @@ export const apiRoutes = {
   integrations: {
     list: "/v1/integrations",
     whatsappStatus: "/v1/integrations/whatsapp/status",
-    whatsappConnect: "/v1/integrations/whatsapp/connect",
     whatsappSession: "/v1/integrations/whatsapp/session",
     whatsappRegenerateCode: "/v1/integrations/whatsapp/session/regenerate-code",
     whatsappDisconnect: "/v1/integrations/whatsapp/disconnect",

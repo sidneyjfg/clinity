@@ -14,11 +14,6 @@ export class IntegrationsController {
     reply.status(200).send(await this.integrationsService.getWhatsAppStatus(getAuthUser(request)));
   };
 
-  public whatsappConnect = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
-    const query = request.query as { number?: string };
-    reply.status(200).send(await this.integrationsService.connectWhatsApp(getAuthUser(request), query.number));
-  };
-
   public disconnectWhatsApp = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
     reply.status(200).send(await this.integrationsService.disconnectWhatsApp(getAuthUser(request)));
   };
