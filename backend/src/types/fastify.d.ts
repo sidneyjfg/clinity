@@ -7,5 +7,6 @@ declare module "fastify" {
   interface FastifyRequest {
     authUser?: AuthenticatedRequestUser;
     systemAdminUser?: SystemAdminRequestUser;
+    rawBody?: Buffer;
   }
 }

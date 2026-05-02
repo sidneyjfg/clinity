@@ -14,8 +14,32 @@ export class PaymentsController {
     reply.status(200).send(await this.paymentsService.updateOrganizationSettings(getAuthUser(request), request.body));
   };
 
-  public createOrganizationMercadoPagoConnectUrl = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
-    reply.status(200).send(await this.paymentsService.createOrganizationMercadoPagoConnectUrl(getAuthUser(request)));
+  public createOrganizationStripeExpressAccount = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+    reply.status(200).send(await this.paymentsService.createOrganizationStripeExpressAccount(getAuthUser(request)));
+  };
+
+  public createOrganizationStripeOnboardingLink = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+    reply.status(200).send(await this.paymentsService.createOrganizationStripeOnboardingLink(getAuthUser(request), request.body));
+  };
+
+  public getOrganizationStripeBalance = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+    reply.status(200).send(await this.paymentsService.getOrganizationStripeBalance(getAuthUser(request)));
+  };
+
+  public requestOrganizationStripePayout = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+    reply.status(200).send(await this.paymentsService.requestOrganizationStripePayout(getAuthUser(request), request.body));
+  };
+
+  public getOrganizationStripeAccountStatus = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+    reply.status(200).send(await this.paymentsService.getOrganizationStripeAccountStatus(getAuthUser(request)));
+  };
+
+  public getOrganizationTransactionHistory = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+    reply.status(200).send(await this.paymentsService.getOrganizationTransactionHistory(getAuthUser(request)));
+  };
+
+  public getOrganizationPayoutHistory = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+    reply.status(200).send(await this.paymentsService.getOrganizationPayoutHistory(getAuthUser(request)));
   };
 
   public getProviderSettings = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
@@ -30,37 +54,58 @@ export class PaymentsController {
     );
   };
 
-  public createMercadoPagoConnectUrl = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  public createStripeExpressAccount = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
     const params = request.params as { providerId?: string };
     reply.status(200).send(
-      await this.paymentsService.createMercadoPagoConnectUrl(getAuthUser(request), params.providerId ?? ""),
+      await this.paymentsService.createStripeExpressAccount(getAuthUser(request), params.providerId ?? ""),
     );
   };
 
-  public handleMercadoPagoOAuthCallback = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
-    reply.status(200).send(await this.paymentsService.handleMercadoPagoOAuthCallback(request.query));
+  public createStripeOnboardingLink = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+    const params = request.params as { providerId?: string };
+    reply.status(200).send(
+      await this.paymentsService.createStripeOnboardingLink(
+        getAuthUser(request),
+        params.providerId ?? "",
+        request.body,
+      ),
+    );
   };
 
-  public handleMercadoPagoWebhook = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
-    const query = request.query as { bookingId?: string; type?: string };
-    const body = request.body as {
-      type?: string;
-      action?: string;
-      data?: {
-        id?: string | number;
-      };
-      resource?: string;
-    };
+  public getStripeBalance = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+    const params = request.params as { providerId?: string };
+    reply.status(200).send(await this.paymentsService.getStripeBalance(getAuthUser(request), params.providerId ?? ""));
+  };
 
-    const webhookInput = {
-      ...(query.bookingId === undefined ? {} : { bookingId: query.bookingId }),
-      ...((body.type ?? query.type ?? body.action) === undefined ? {} : { eventType: body.type ?? query.type ?? body.action }),
-      ...(body.data?.id === undefined ? {} : { paymentId: String(body.data.id) }),
-      payload: body,
-      ...(request.headers["x-signature"] === undefined ? {} : { signature: request.headers["x-signature"].toString() }),
-      ...(request.headers["x-request-id"] === undefined ? {} : { requestId: request.headers["x-request-id"].toString() }),
-    };
+  public requestStripePayout = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+    const params = request.params as { providerId?: string };
+    reply.status(200).send(
+      await this.paymentsService.requestStripePayout(getAuthUser(request), params.providerId ?? "", request.body),
+    );
+  };
 
-    reply.status(200).send(await this.paymentsService.handleMercadoPagoWebhook(webhookInput));
+  public getStripeAccountStatus = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+    const params = request.params as { providerId?: string };
+    reply.status(200).send(await this.paymentsService.getStripeAccountStatus(getAuthUser(request), params.providerId ?? ""));
+  };
+
+  public getTransactionHistory = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+    const params = request.params as { providerId?: string };
+    reply.status(200).send(await this.paymentsService.getTransactionHistory(getAuthUser(request), params.providerId ?? ""));
+  };
+
+  public getPayoutHistory = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+    const params = request.params as { providerId?: string };
+    reply.status(200).send(await this.paymentsService.getPayoutHistory(getAuthUser(request), params.providerId ?? ""));
+  };
+
+  public handleStripeWebhook = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+    const rawBody = request.rawBody ?? Buffer.from(JSON.stringify(request.body ?? {}), "utf-8");
+    const signature = request.headers["stripe-signature"]?.toString();
+
+    reply.status(200).send(await this.paymentsService.handleStripeWebhook({
+      rawBody,
+      ...(signature === undefined ? {} : { signature }),
+    }));
   };
 }

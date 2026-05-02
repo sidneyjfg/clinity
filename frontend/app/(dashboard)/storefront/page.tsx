@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, BriefcaseMedical, Camera, CheckCircle2, CreditCard, Eye, ImagePlus, MapPin, Save, Store, UploadCloud, UserRound } from "lucide-react";
+import { AlertCircle, BriefcaseMedical, Camera, CheckCircle2, Eye, ImagePlus, MapPin, Save, Store, UploadCloud, UserRound } from "lucide-react";
 
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -65,17 +65,6 @@ const buildAddress = (form: StorefrontForm): string => {
   return [street, location].filter(Boolean).join(" · ");
 };
 
-const bpsFromPercent = (value: string): number => {
-  const normalized = value.replace(",", ".").trim();
-  if (!normalized) {
-    return 0;
-  }
-
-  return Math.round(Number(normalized) * 100);
-};
-
-const percentFromBps = (value: number): string => (value / 100).toFixed(2);
-
 type ReadinessItem = {
   id: string;
   label: string;
@@ -90,9 +79,6 @@ export default function StorefrontPage() {
   const isAdministrator = role === "administrator";
   const [form, setForm] = useState<StorefrontForm>(emptyForm);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
-  const [commissionRate, setCommissionRate] = useState("10.00");
-  const [onlineDiscount, setOnlineDiscount] = useState("5.00");
-  const [absorbsProcessingFee, setAbsorbsProcessingFee] = useState(true);
 
   const { data } = useQuery({
     queryKey: ["storefront"],
@@ -113,6 +99,12 @@ export default function StorefrontPage() {
     queryKey: ["organization-payment-settings"],
     queryFn: api.getOrganizationPaymentSettings,
     enabled: isAdministrator
+  });
+
+  const paymentStatusQuery = useQuery({
+    queryKey: ["organization-stripe-status", paymentSettingsQuery.data?.stripeAccountId],
+    queryFn: api.getOrganizationStripeAccountStatus,
+    enabled: Boolean(isAdministrator && paymentSettingsQuery.data?.stripeAccountId)
   });
 
   const providerIds = useMemo(
@@ -163,23 +155,17 @@ export default function StorefrontPage() {
     });
   }, [data]);
 
-  useEffect(() => {
-    if (!paymentSettingsQuery.data) {
-      return;
-    }
-
-    setCommissionRate(percentFromBps(paymentSettingsQuery.data.commissionRateBps));
-    setOnlineDiscount(percentFromBps(paymentSettingsQuery.data.onlineDiscountBps));
-    setAbsorbsProcessingFee(paymentSettingsQuery.data.absorbsProcessingFee);
-  }, [paymentSettingsQuery.data]);
-
   const gallery = useMemo(() => parseGallery(form.galleryImageUrls), [form.galleryImageUrls]);
   const previewImages = [form.coverImageUrl, ...gallery].filter((url) => url.trim().length > 0);
   const address = buildAddress(form);
   const activeProviders = providersQuery.data?.items.filter((provider) => provider.isActive) ?? [];
   const activePricedServices = servicesQuery.data?.items.filter((service) => service.isActive && (service.priceCents ?? 0) > 0) ?? [];
-  const hasPaymentAccount = Boolean(
-    isAdministrator && paymentSettingsQuery.data?.mercadoPagoConnected && paymentSettingsQuery.data.mercadoPagoAccessToken
+  const hasPaymentAccountVerified = Boolean(
+    isAdministrator
+      && (paymentStatusQuery.data?.canReceivePayments
+      ?? (paymentSettingsQuery.data?.stripeAccountStatus === "verified"
+        && paymentSettingsQuery.data.stripeChargesEnabled
+        && paymentSettingsQuery.data.stripePayoutsEnabled))
   );
   const schedulableProviderIds = new Set(
     (readinessQuery.data ?? [])
@@ -190,7 +176,7 @@ export default function StorefrontPage() {
     activeProviders
       .filter((provider) =>
         activePricedServices.some((service) => service.providerId === provider.id)
-          && hasPaymentAccount
+          && hasPaymentAccountVerified
           && schedulableProviderIds.has(provider.id)
       )
       .map((provider) => provider.id)
@@ -204,6 +190,12 @@ export default function StorefrontPage() {
       && form.state.trim()
       && form.coverImageUrl.trim()
   );
+  const canPublishStorefront = hasMinimumPublicProfile
+    && activeProviders.length > 0
+    && activePricedServices.length > 0
+    && hasPaymentAccountVerified
+    && schedulableProviderIds.size > 0
+    && readyProviderIds.size > 0;
   const checklist: ReadinessItem[] = [
     {
       id: "profile",
@@ -216,7 +208,7 @@ export default function StorefrontPage() {
       id: "publish",
       label: "Vitrine publicada",
       description: "O seletor de publicação precisa estar ativo.",
-      isComplete: form.isStorefrontPublished,
+      isComplete: form.isStorefrontPublished && canPublishStorefront,
       href: "/storefront"
     },
     {
@@ -235,12 +227,12 @@ export default function StorefrontPage() {
     },
     {
       id: "payments",
-      label: "Mercado Pago conectado",
+      label: "Pagamentos online ativos",
       description: isAdministrator
-        ? "Conecte a conta Mercado Pago da clínica ou barbearia."
-        : "Somente administrador configura a conta Mercado Pago.",
-      isComplete: hasPaymentAccount,
-      href: "/storefront"
+        ? "Conclua a verificação de identidade da organização em Configurações."
+        : "Somente administradores podem validar a conta de pagamentos.",
+      isComplete: hasPaymentAccountVerified,
+      href: "/settings"
     },
     {
       id: "availability",
@@ -252,7 +244,7 @@ export default function StorefrontPage() {
     {
       id: "ready",
       label: "Conta pronta para venda",
-      description: "A conta precisa ter serviço com preço, agenda e Mercado Pago conectado.",
+      description: "A conta precisa ter serviço com preço, agenda e pagamentos online ativos.",
       isComplete: readyProviderIds.size > 0,
       href: "/providers"
     }
@@ -283,7 +275,7 @@ export default function StorefrontPage() {
         coverImageUrl: toNullable(form.coverImageUrl),
         logoImageUrl: toNullable(form.logoImageUrl),
         galleryImageUrls: gallery,
-        isStorefrontPublished: form.isStorefrontPublished
+        isStorefrontPublished: canPublishStorefront ? form.isStorefrontPublished : false
       }),
     meta: {
       errorMessage: "Vitrine não salva",
@@ -295,34 +287,8 @@ export default function StorefrontPage() {
     }
   });
 
-  const paymentSettingsMutation = useMutation({
-    mutationFn: () =>
-      api.updateOrganizationPaymentSettings({
-        commissionRateBps: bpsFromPercent(commissionRate),
-        onlineDiscountBps: bpsFromPercent(onlineDiscount),
-        absorbsProcessingFee
-      }),
-    meta: {
-      errorMessage: "Configuração de pagamento não salva",
-      successMessage: "Configuração de pagamento salva com sucesso"
-    },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["organization-payment-settings"] });
-    }
-  });
-
-  const mercadoPagoConnectMutation = useMutation({
-    mutationFn: api.createOrganizationMercadoPagoConnectUrl,
-    meta: {
-      errorMessage: "Conexão Mercado Pago não iniciada",
-      successMessage: "Abrindo autorização do Mercado Pago"
-    },
-    onSuccess: (result) => {
-      window.location.href = result.authorizationUrl;
-    }
-  });
-
   const selectedPhotoUrl = selectedPhoto ?? previewImages[0] ?? "";
+  const isVisiblyPublished = form.isStorefrontPublished && canPublishStorefront;
 
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
@@ -333,10 +299,24 @@ export default function StorefrontPage() {
             <h1 className="mt-2 text-3xl font-semibold text-white">Perfil público da empresa</h1>
           </div>
           <div className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 px-4 py-3">
-            <span className="text-sm text-slate-300">{form.isStorefrontPublished ? "Publicado" : "Rascunho"}</span>
-            <Toggle checked={form.isStorefrontPublished} onChange={() => updateField("isStorefrontPublished", !form.isStorefrontPublished)} />
+            <span className="text-sm text-slate-300">{isVisiblyPublished ? "Publicado" : "Rascunho"}</span>
+            <span className={!canPublishStorefront ? "opacity-50" : undefined}>
+              <Toggle
+                checked={isVisiblyPublished}
+                onChange={() => {
+                  if (canPublishStorefront) {
+                    updateField("isStorefrontPublished", !form.isStorefrontPublished);
+                  }
+                }}
+              />
+            </span>
           </div>
         </div>
+        {!canPublishStorefront ? (
+          <div className="rounded-lg border border-amber-300/20 bg-amber-300/10 p-4 text-sm leading-6 text-amber-100">
+            A vitrine fica bloqueada para clientes até perfil, profissionais, serviços, agenda e pagamentos online estarem configurados corretamente.
+          </div>
+        ) : null}
 
         <Card>
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -381,62 +361,6 @@ export default function StorefrontPage() {
             </ButtonLink>
           </div>
         </Card>
-
-        {isAdministrator ? (
-        <Card>
-          <div className="mb-6 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-400/10 text-sky-300">
-              <CreditCard className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="font-semibold text-white">Conta de pagamento</p>
-              <p className="text-sm text-slate-400">
-                Conexão Mercado Pago da clínica ou barbearia. Todos os pagamentos online usam esta conta.
-              </p>
-            </div>
-          </div>
-          <div className="mb-4 rounded-lg border border-white/10 bg-white/5 p-4 text-sm text-slate-300">
-            Mercado Pago: {hasPaymentAccount ? "conectado" : "não conectado"}
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <Input
-              onChange={(event) => setCommissionRate(event.target.value)}
-              placeholder="Comissão da plataforma em %, ex: 10"
-              value={commissionRate}
-            />
-            <Input
-              onChange={(event) => setOnlineDiscount(event.target.value)}
-              placeholder="Desconto online em %, ex: 5"
-              value={onlineDiscount}
-            />
-          </div>
-          <label className="mt-4 flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-slate-300">
-            <input
-              checked={absorbsProcessingFee}
-              className="h-4 w-4"
-              onChange={(event) => setAbsorbsProcessingFee(event.target.checked)}
-              type="checkbox"
-            />
-            A conta absorve a taxa de processamento
-          </label>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Button disabled={paymentSettingsMutation.isPending} onClick={() => paymentSettingsMutation.mutate()}>
-              <Save className="mr-2 h-4 w-4" />
-              Salvar pagamentos
-            </Button>
-            <Button
-              disabled={mercadoPagoConnectMutation.isPending}
-              onClick={() => mercadoPagoConnectMutation.mutate()}
-              variant="secondary"
-            >
-              <CreditCard className="mr-2 h-4 w-4" />
-              Conectar Mercado Pago
-            </Button>
-            {paymentSettingsMutation.error ? <p className="text-sm text-rose-300">{paymentSettingsMutation.error.message}</p> : null}
-            {mercadoPagoConnectMutation.error ? <p className="text-sm text-rose-300">{mercadoPagoConnectMutation.error.message}</p> : null}
-          </div>
-        </Card>
-        ) : null}
 
         <Card>
           <div className="mb-6 flex items-center gap-3">
@@ -568,7 +492,7 @@ export default function StorefrontPage() {
               </div>
               <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
                 <p className="text-slate-400">Status</p>
-                <p className="mt-1 text-white">{form.isStorefrontPublished ? "Visível" : "Rascunho"}</p>
+                <p className="mt-1 text-white">{isVisiblyPublished ? "Visível" : "Rascunho"}</p>
               </div>
             </div>
           </div>

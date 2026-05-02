@@ -134,7 +134,7 @@ export class EvolutionWhatsAppService {
   }
 
   public async getStatus(instanceName: string): Promise<WhatsAppConnectionStatus> {
-    const data = await this.request<{ instance: { instanceName: string; state: string } }>(
+    const data = await this.request<{ instance?: { instanceName: string; state: string } }>(
       `/instance/connectionState/${instanceName}`,
       {
         method: "GET",
@@ -142,7 +142,7 @@ export class EvolutionWhatsAppService {
     );
 
     return {
-      state: data.instance.state,
+      state: data.instance?.state ?? "disconnected",
     };
   }
 

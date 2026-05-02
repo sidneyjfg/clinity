@@ -1,5 +1,6 @@
 import Fastify from "fastify";
 import type { FastifyInstance } from "fastify";
+import { Readable } from "node:stream";
 import type { DataSource } from "typeorm";
 
 import { registerApiDocs } from "./docs/register-api-docs";
@@ -39,6 +40,20 @@ export const buildApp = (dependencies: AppDependencies): FastifyInstance => {
     if (request.method === "OPTIONS") {
       reply.status(204).send();
     }
+  });
+
+  app.addHook("preParsing", async (request, _reply, payload) => {
+    if (request.url.split("?")[0] !== "/v1/public/payments/stripe/webhooks") {
+      return payload;
+    }
+
+    const chunks: Buffer[] = [];
+    for await (const chunk of payload) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+
+    request.rawBody = Buffer.concat(chunks);
+    return Readable.from(request.rawBody);
   });
 
   registerApiDocs(app);

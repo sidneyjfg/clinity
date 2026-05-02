@@ -1,58 +1,96 @@
+import { randomUUID } from "node:crypto";
+import type { Account } from "stripe/cjs/resources/Accounts";
+import type { Balance } from "stripe/cjs/resources/Balance";
+import type { Event } from "stripe/cjs/resources/Events";
+import type { PaymentIntent } from "stripe/cjs/resources/PaymentIntents";
+import type { Payout } from "stripe/cjs/resources/Payouts";
 import type { DataSource, EntityManager } from "typeorm";
 import { z } from "zod";
 
 import { AuditRepository } from "../repositories/audit.repository";
 import { BookingsRepository } from "../repositories/bookings.repository";
+import { FinancialLedgerRepository } from "../repositories/financial-ledger.repository";
 import { OrganizationPaymentSettingsRepository } from "../repositories/organization-payment-settings.repository";
 import { PaymentTransactionsRepository } from "../repositories/payment-transactions.repository";
+import { ProviderPayoutsRepository } from "../repositories/provider-payouts.repository";
 import { ProviderPaymentSettingsRepository } from "../repositories/provider-payment-settings.repository";
 import { ProvidersRepository } from "../repositories/providers.repository";
 import { ServiceOfferingsRepository } from "../repositories/service-offerings.repository";
+import { StripeWebhookEventsRepository } from "../repositories/stripe-webhook-events.repository";
 import type { AuthenticatedRequestUser } from "../types/auth";
 import type { Booking, BookingPaymentStatus } from "../types/booking";
-import type { MercadoPagoOAuthConnectUrl, MercadoPagoWebhookInput, PaymentBreakdown, PaymentType } from "../types/payment";
+import type {
+  FinancialHistoryItem,
+  PaymentBreakdown,
+  PaymentType,
+  StripeAccountStatus,
+  StripeAccountStatusResponse,
+  StripeBalance,
+  StripeConnectAccount,
+  StripeOnboardingLink,
+  StripePayoutResult,
+} from "../types/payment";
+import type { Provider } from "../types/provider";
 import { AppError } from "../utils/app-error";
 import { env } from "../utils/env";
-import { PaymentCalculatorService } from "./payment-calculator.service";
-import { MercadoPagoService } from "./mercado-pago.service";
 import { NotificationsService } from "./notifications.service";
+import { PaymentCalculatorService } from "./payment-calculator.service";
+import { StripeService } from "./stripe.service";
+
+const STRIPE_PLATFORM_FEE_BPS = 1000;
+const MIN_PAYOUT_CENTS = 500;
+const MAX_PAYOUT_CENTS = 5_000_000;
 
 const paymentSettingsSchema = z.object({
-  commissionRateBps: z.number().int().min(0).max(10000).optional(),
   onlineDiscountBps: z.number().int().min(0).max(10000).optional(),
   absorbsProcessingFee: z.boolean().optional(),
 });
 
-const oauthCallbackSchema = z.object({
-  code: z.string().min(10),
-  state: z.string().min(3),
+const onboardingLinkSchema = z.object({
+  returnUrl: z.string().url().optional(),
+  refreshUrl: z.string().url().optional(),
 });
 
-const splitState = (state: string): { organizationId: string; providerId: string } => {
-  const [organizationId, providerId] = state.split(":");
+const payoutSchema = z.object({
+  amountCents: z.number().int().min(MIN_PAYOUT_CENTS).max(MAX_PAYOUT_CENTS),
+  currency: z.string().trim().length(3).default("brl"),
+  idempotencyKey: z.string().trim().min(12).max(160).optional(),
+});
 
-  if (!organizationId || !providerId) {
-    throw new AppError("payments.invalid_oauth_state", "Invalid OAuth state.", 400);
-  }
-
-  return { organizationId, providerId };
-};
-
-const mapMercadoPagoStatus = (status: string | undefined): BookingPaymentStatus => {
-  if (status === "approved") {
-    return "approved";
-  }
-
-  if (status === "rejected") {
-    return "rejected";
-  }
-
-  if (status === "cancelled") {
-    return "cancelled";
-  }
-
+const mapPaymentIntentStatus = (status: PaymentIntent.Status | undefined): BookingPaymentStatus => {
+  if (status === "succeeded") return "approved";
+  if (status === "canceled") return "cancelled";
+  if (status === "requires_capture") return "rejected";
   return "pending";
 };
+
+const getLatestChargeId = (paymentIntent: PaymentIntent): string | null => {
+  const charge = paymentIntent.latest_charge;
+  return !charge ? null : typeof charge === "string" ? charge : charge.id;
+};
+
+const mapStripeBalanceAmount = (amount: Balance.Available): { amount: number; currency: string } => ({
+  amount: amount.amount,
+  currency: amount.currency,
+});
+
+const toHistoryItem = (item: {
+  amountCents: number;
+  currency: string;
+  type: string;
+  status: string;
+  createdAt: Date;
+  failureReason: string | null;
+  metadata?: unknown | null;
+}): FinancialHistoryItem => ({
+  amountCents: item.amountCents,
+  currency: item.currency,
+  type: item.type,
+  status: item.status,
+  createdAt: item.createdAt.toISOString(),
+  failureReason: item.failureReason,
+  metadata: item.metadata ?? null,
+});
 
 export class PaymentsService {
   public constructor(
@@ -66,7 +104,10 @@ export class PaymentsService {
     private readonly auditRepository: AuditRepository,
     private readonly notificationsService: NotificationsService,
     private readonly paymentCalculatorService: PaymentCalculatorService,
-    private readonly mercadoPagoService: MercadoPagoService,
+    private readonly stripeService: StripeService,
+    private readonly webhookEventsRepository: StripeWebhookEventsRepository,
+    private readonly ledgerRepository: FinancialLedgerRepository,
+    private readonly providerPayoutsRepository: ProviderPayoutsRepository,
   ) {}
 
   public async getOrganizationSettings(user: AuthenticatedRequestUser) {
@@ -76,7 +117,6 @@ export class PaymentsService {
   public async updateOrganizationSettings(user: AuthenticatedRequestUser, input: unknown) {
     const data = paymentSettingsSchema.parse(input);
     const updateInput = {
-      ...(data.commissionRateBps === undefined ? {} : { commissionRateBps: data.commissionRateBps }),
       ...(data.onlineDiscountBps === undefined ? {} : { onlineDiscountBps: data.onlineDiscountBps }),
       ...(data.absorbsProcessingFee === undefined ? {} : { absorbsProcessingFee: data.absorbsProcessingFee }),
     };
@@ -84,72 +124,334 @@ export class PaymentsService {
     return this.organizationPaymentSettingsRepository.updateInOrganization(user.organizationId, updateInput);
   }
 
-  public async createOrganizationMercadoPagoConnectUrl(user: AuthenticatedRequestUser): Promise<MercadoPagoOAuthConnectUrl> {
-    return {
-      providerId: "organization",
-      authorizationUrl: this.mercadoPagoService.buildOAuthAuthorizationUrl(user.organizationId),
-    };
-  }
-
   public async getProviderSettings(user: AuthenticatedRequestUser, providerId: string) {
-    await this.ensureProvider(user.organizationId, providerId);
+    await this.ensureFinancialAccess(user, providerId);
     return this.providerPaymentSettingsRepository.getOrCreateDefault(user.organizationId, providerId);
   }
 
-  public async updateProviderSettings(
-    user: AuthenticatedRequestUser,
-    providerId: string,
-    input: unknown,
-  ) {
-    await this.ensureProvider(user.organizationId, providerId);
+  public async updateProviderSettings(user: AuthenticatedRequestUser, providerId: string, input: unknown) {
+    await this.ensureFinancialAccess(user, providerId);
     const data = paymentSettingsSchema.parse(input);
-    const updateInput = {
-      ...(data.commissionRateBps === undefined ? {} : { commissionRateBps: data.commissionRateBps }),
+    return this.providerPaymentSettingsRepository.updateInOrganization(user.organizationId, providerId, {
       ...(data.onlineDiscountBps === undefined ? {} : { onlineDiscountBps: data.onlineDiscountBps }),
       ...(data.absorbsProcessingFee === undefined ? {} : { absorbsProcessingFee: data.absorbsProcessingFee }),
-    };
-
-    return this.providerPaymentSettingsRepository.updateInOrganization(user.organizationId, providerId, updateInput);
+    });
   }
 
-  public async createMercadoPagoConnectUrl(
+  public async createStripeExpressAccount(
     user: AuthenticatedRequestUser,
     providerId: string,
-  ): Promise<MercadoPagoOAuthConnectUrl> {
-    await this.ensureProvider(user.organizationId, providerId);
-    const state = `${user.organizationId}:${providerId}`;
+  ): Promise<StripeConnectAccount> {
+    this.ensureAdministrator(user);
+    const provider = await this.getProvider(user.organizationId, providerId);
+    const account = provider.stripeAccountId
+      ? await this.stripeService.retrieveAccount(provider.stripeAccountId)
+      : await this.stripeService.createExpressAccount({
+        organizationId: user.organizationId,
+        providerId,
+        accountName: provider.fullName,
+      });
+
+    if (!provider.stripeAccountId) {
+      await this.providersRepository.saveStripeAccountId(user.organizationId, providerId, account.id);
+    }
+
+    await this.saveStripeAccountSnapshot(user.organizationId, providerId, account);
+    await this.auditRepository.create({
+      organizationId: user.organizationId,
+      actorId: user.id,
+      action: "provider_payment.stripe_account_created",
+      targetType: "provider",
+      targetId: providerId,
+    });
 
     return {
       providerId,
-      authorizationUrl: this.mercadoPagoService.buildOAuthAuthorizationUrl(state),
+      stripeAccountId: account.id,
+      chargesEnabled: account.chargesEnabled,
+      payoutsEnabled: account.payoutsEnabled,
+      detailsSubmitted: account.detailsSubmitted,
     };
   }
 
-  public async handleMercadoPagoOAuthCallback(input: unknown) {
-    const data = oauthCallbackSchema.parse(input);
-    const stateData = data.state.includes(":") ? splitState(data.state) : { organizationId: data.state, providerId: null };
-    const token = await this.mercadoPagoService.exchangeOAuthCode(data.code);
-    const expiresAt = new Date(Date.now() + token.expires_in * 1000);
+  public async createOrganizationStripeExpressAccount(user: AuthenticatedRequestUser): Promise<StripeConnectAccount> {
+    this.ensureAdministrator(user);
+    const settings = await this.organizationPaymentSettingsRepository.getOrCreateDefault(user.organizationId);
+    const account = settings.stripeAccountId
+      ? await this.stripeService.retrieveAccount(settings.stripeAccountId)
+      : await this.stripeService.createExpressAccount({
+        organizationId: user.organizationId,
+        accountName: `Hubly ${user.organizationId}`,
+      });
 
-    const settings = await this.organizationPaymentSettingsRepository.saveMercadoPagoConnection(
-      stateData.organizationId,
-      {
-        mercadoPagoUserId: String(token.user_id),
-        mercadoPagoAccessToken: token.access_token,
-        mercadoPagoRefreshToken: token.refresh_token,
-        mercadoPagoTokenExpiresAt: expiresAt,
-      },
-    );
+    if (!settings.stripeAccountId) {
+      await this.organizationPaymentSettingsRepository.saveStripeAccountId(user.organizationId, account.id);
+    }
 
+    await this.saveOrganizationStripeAccountSnapshot(user.organizationId, account);
     await this.auditRepository.create({
-      organizationId: stateData.organizationId,
-      actorId: null,
-      action: "organization_payment.mercado_pago_connected",
+      organizationId: user.organizationId,
+      actorId: user.id,
+      action: "organization_payment.stripe_account_created",
       targetType: "organization",
-      targetId: stateData.organizationId,
+      targetId: user.organizationId,
     });
 
-    return settings;
+    return {
+      organizationId: user.organizationId,
+      stripeAccountId: account.id,
+      chargesEnabled: account.chargesEnabled,
+      payoutsEnabled: account.payoutsEnabled,
+      detailsSubmitted: account.detailsSubmitted,
+    };
+  }
+
+  public async createStripeOnboardingLink(
+    user: AuthenticatedRequestUser,
+    providerId: string,
+    input: unknown,
+  ): Promise<StripeOnboardingLink> {
+    await this.ensureFinancialAccess(user, providerId);
+    const data = onboardingLinkSchema.parse(input ?? {});
+    const account = user.role === "administrator"
+      ? await this.createStripeExpressAccount(user, providerId)
+      : await this.getExistingStripeAccount(user, providerId);
+    const onboardingUrl = await this.stripeService.createAccountOnboardingLink({
+      stripeAccountId: account.stripeAccountId,
+      returnUrl: data.returnUrl ?? env.STRIPE_CONNECT_RETURN_URL,
+      refreshUrl: data.refreshUrl ?? env.STRIPE_CONNECT_REFRESH_URL,
+    });
+
+    return { providerId, onboardingUrl };
+  }
+
+  public async createOrganizationStripeOnboardingLink(
+    user: AuthenticatedRequestUser,
+    input: unknown,
+  ): Promise<StripeOnboardingLink> {
+    this.ensureAdministrator(user);
+    const data = onboardingLinkSchema.parse(input ?? {});
+    const account = await this.createOrganizationStripeExpressAccount(user);
+    const onboardingUrl = await this.stripeService.createAccountOnboardingLink({
+      stripeAccountId: account.stripeAccountId,
+      returnUrl: data.returnUrl ?? env.STRIPE_CONNECT_RETURN_URL,
+      refreshUrl: data.refreshUrl ?? env.STRIPE_CONNECT_REFRESH_URL,
+    });
+
+    return { organizationId: user.organizationId, onboardingUrl };
+  }
+
+  public async getStripeBalance(user: AuthenticatedRequestUser, providerId: string): Promise<StripeBalance> {
+    const provider = await this.ensureFinancialAccess(user, providerId);
+    const stripeAccountId = this.requireStripeAccount(provider);
+    const balance = await this.stripeService.retrieveBalance(stripeAccountId);
+
+    return {
+      providerId,
+      available: balance.available.map(mapStripeBalanceAmount),
+      pending: balance.pending.map(mapStripeBalanceAmount),
+    };
+  }
+
+  public async getOrganizationStripeBalance(user: AuthenticatedRequestUser): Promise<StripeBalance> {
+    this.ensureAdministrator(user);
+    const stripeAccountId = await this.requireOrganizationStripeAccount(user.organizationId);
+    const balance = await this.stripeService.retrieveBalance(stripeAccountId);
+
+    return {
+      organizationId: user.organizationId,
+      available: balance.available.map(mapStripeBalanceAmount),
+      pending: balance.pending.map(mapStripeBalanceAmount),
+    };
+  }
+
+  public async getStripeAccountStatus(
+    user: AuthenticatedRequestUser,
+    providerId: string,
+  ): Promise<StripeAccountStatusResponse> {
+    const provider = await this.ensureFinancialAccess(user, providerId);
+    const stripeAccountId = this.requireStripeAccount(provider);
+    const account = await this.stripeService.retrieveAccount(stripeAccountId);
+    await this.saveStripeAccountSnapshot(user.organizationId, providerId, account);
+    return this.buildAccountStatusResponse({ providerId }, account);
+  }
+
+  public async getOrganizationStripeAccountStatus(user: AuthenticatedRequestUser): Promise<StripeAccountStatusResponse> {
+    this.ensureAdministrator(user);
+    const stripeAccountId = await this.requireOrganizationStripeAccount(user.organizationId);
+    const account = await this.stripeService.retrieveAccount(stripeAccountId);
+    await this.saveOrganizationStripeAccountSnapshot(user.organizationId, account);
+    return this.buildAccountStatusResponse({ organizationId: user.organizationId }, account);
+  }
+
+  public async getTransactionHistory(user: AuthenticatedRequestUser, providerId: string): Promise<{ items: FinancialHistoryItem[] }> {
+    await this.ensureFinancialAccess(user, providerId);
+    const items = await this.ledgerRepository.findByProvider(user.organizationId, providerId, {
+      types: ["payment_created", "payment_succeeded", "payment_failed"],
+    });
+    return { items: items.map(toHistoryItem) };
+  }
+
+  public async getOrganizationTransactionHistory(user: AuthenticatedRequestUser): Promise<{ items: FinancialHistoryItem[] }> {
+    this.ensureAdministrator(user);
+    const items = await this.ledgerRepository.findByOrganization(user.organizationId, {
+      types: ["payment_created", "payment_succeeded", "payment_failed"],
+    });
+    return { items: items.map(toHistoryItem) };
+  }
+
+  public async getPayoutHistory(user: AuthenticatedRequestUser, providerId: string): Promise<{ items: FinancialHistoryItem[] }> {
+    await this.ensureFinancialAccess(user, providerId);
+    const items = await this.ledgerRepository.findByProvider(user.organizationId, providerId, {
+      types: ["payout_requested", "payout_paid", "payout_failed"],
+    });
+    return { items: items.map(toHistoryItem) };
+  }
+
+  public async getOrganizationPayoutHistory(user: AuthenticatedRequestUser): Promise<{ items: FinancialHistoryItem[] }> {
+    this.ensureAdministrator(user);
+    const items = await this.ledgerRepository.findByOrganization(user.organizationId, {
+      types: ["payout_requested", "payout_paid", "payout_failed"],
+    });
+    return { items: items.map(toHistoryItem) };
+  }
+
+  public async requestStripePayout(
+    user: AuthenticatedRequestUser,
+    providerId: string,
+    input: unknown,
+  ): Promise<StripePayoutResult> {
+    const data = payoutSchema.parse(input);
+    const provider = await this.ensureFinancialAccess(user, providerId);
+    const stripeAccountId = this.requireStripeAccount(provider);
+    const account = await this.stripeService.retrieveAccount(stripeAccountId);
+    await this.saveStripeAccountSnapshot(user.organizationId, providerId, account);
+    this.assertVerifiedAccount(account, "payout");
+
+    const idempotencyKey = data.idempotencyKey ?? `payout:${providerId}:${randomUUID()}`;
+    const currency = data.currency.toLowerCase();
+    const pendingPayout = await this.dataSource.transaction("SERIALIZABLE", async (manager) => {
+      return this.providerPayoutsRepository.createPending({
+        organizationId: user.organizationId,
+        providerId,
+        stripeAccountId,
+        idempotencyKey,
+        amountCents: data.amountCents,
+        currency,
+      }, manager);
+    });
+
+    if (pendingPayout.stripePayoutId) {
+      return {
+        providerId,
+        payoutId: pendingPayout.stripePayoutId,
+        amount: pendingPayout.amountCents,
+        currency: pendingPayout.currency,
+        status: pendingPayout.status,
+      };
+    }
+
+    try {
+      const payout = await this.stripeService.createPayout({
+        stripeAccountId,
+        amountCents: data.amountCents,
+        currency,
+        idempotencyKey,
+      });
+
+      await this.providerPayoutsRepository.updateStripeResult({
+        id: pendingPayout.id,
+        stripePayoutId: payout.id,
+        status: payout.status,
+      });
+      await this.ledgerRepository.append({
+        organizationId: user.organizationId,
+        providerId,
+        payoutId: pendingPayout.id,
+        stripeAccountId,
+        stripeObjectId: payout.id,
+        type: "payout_requested",
+        amountCents: payout.amount,
+        currency: payout.currency,
+        status: payout.status,
+      });
+
+      return { providerId, payoutId: payout.id, amount: payout.amount, currency: payout.currency, status: payout.status };
+    } catch (error) {
+      await this.providerPayoutsRepository.updateStripeResult({
+        id: pendingPayout.id,
+        status: "failed",
+        failureReason: error instanceof Error ? error.message : "Payout request failed.",
+      });
+      throw error;
+    }
+  }
+
+  public async requestOrganizationStripePayout(user: AuthenticatedRequestUser, input: unknown): Promise<StripePayoutResult> {
+    this.ensureAdministrator(user);
+    const data = payoutSchema.parse(input);
+    const stripeAccountId = await this.requireOrganizationStripeAccount(user.organizationId);
+    const account = await this.stripeService.retrieveAccount(stripeAccountId);
+    await this.saveOrganizationStripeAccountSnapshot(user.organizationId, account);
+    this.assertVerifiedAccount(account, "payout");
+
+    const idempotencyKey = data.idempotencyKey ?? `payout:${user.organizationId}:${randomUUID()}`;
+    const currency = data.currency.toLowerCase();
+    const pendingPayout = await this.dataSource.transaction("SERIALIZABLE", async (manager) => {
+      return this.providerPayoutsRepository.createPending({
+        organizationId: user.organizationId,
+        providerId: null,
+        stripeAccountId,
+        idempotencyKey,
+        amountCents: data.amountCents,
+        currency,
+      }, manager);
+    });
+
+    if (pendingPayout.stripePayoutId) {
+      return {
+        organizationId: user.organizationId,
+        payoutId: pendingPayout.stripePayoutId,
+        amount: pendingPayout.amountCents,
+        currency: pendingPayout.currency,
+        status: pendingPayout.status,
+      };
+    }
+
+    try {
+      const payout = await this.stripeService.createPayout({
+        stripeAccountId,
+        amountCents: data.amountCents,
+        currency,
+        idempotencyKey,
+      });
+
+      await this.providerPayoutsRepository.updateStripeResult({
+        id: pendingPayout.id,
+        stripePayoutId: payout.id,
+        status: payout.status,
+      });
+      await this.ledgerRepository.append({
+        organizationId: user.organizationId,
+        providerId: null,
+        payoutId: pendingPayout.id,
+        stripeAccountId,
+        stripeObjectId: payout.id,
+        type: "payout_requested",
+        amountCents: payout.amount,
+        currency: payout.currency,
+        status: payout.status,
+      });
+
+      return { organizationId: user.organizationId, payoutId: payout.id, amount: payout.amount, currency: payout.currency, status: payout.status };
+    } catch (error) {
+      await this.providerPayoutsRepository.updateStripeResult({
+        id: pendingPayout.id,
+        status: "failed",
+        failureReason: error instanceof Error ? error.message : "Payout request failed.",
+      });
+      throw error;
+    }
   }
 
   public async buildBreakdown(
@@ -161,171 +463,414 @@ export class PaymentsService {
   ): Promise<PaymentBreakdown> {
     const amountCents = await this.resolveOfferingPrice(organizationId, providerId, offeringId, manager);
     const settings = await this.organizationPaymentSettingsRepository.getOrCreateDefault(organizationId, manager);
-
-    return this.paymentCalculatorService.calculate(paymentType, amountCents, settings);
+    return this.paymentCalculatorService.calculate(paymentType, amountCents, {
+      commissionRateBps: STRIPE_PLATFORM_FEE_BPS,
+      onlineDiscountBps: settings.onlineDiscountBps,
+    });
   }
 
   public async prepareOnlinePayment(input: {
     booking: Booking;
     customerEmail?: string | null;
     serviceName?: string | null;
-    manager: EntityManager;
+    manager?: EntityManager;
   }): Promise<Booking> {
-    const settings = await this.organizationPaymentSettingsRepository.getOrCreateDefault(
-      input.booking.organizationId,
-      input.manager,
-    );
+    const stripeAccountId = await this.requireOrganizationStripeAccount(input.booking.organizationId, input.manager);
+    const account = await this.stripeService.retrieveAccount(stripeAccountId);
+    await this.saveOrganizationStripeAccountSnapshot(input.booking.organizationId, account, input.manager);
+    this.assertVerifiedAccount(account, "payment");
 
-    if (!settings.mercadoPagoConnected || !settings.mercadoPagoAccessToken) {
-      throw new AppError("payments.organization_not_connected", "Organization must connect Mercado Pago before online payments.", 409);
-    }
-
-    const transaction = await this.paymentTransactionsRepository.create(
-      {
-        organizationId: input.booking.organizationId,
-        bookingId: input.booking.id,
-        providerId: input.booking.providerId,
-        breakdown: {
-          paymentType: input.booking.paymentType,
-          originalAmountCents: input.booking.originalAmountCents,
-          discountedAmountCents: input.booking.discountedAmountCents,
-          onlineDiscountCents: input.booking.onlineDiscountCents,
-          platformCommissionRateBps: input.booking.platformCommissionRateBps,
-          platformCommissionCents: input.booking.platformCommissionCents,
-          providerNetAmountCents: input.booking.providerNetAmountCents,
-          paymentStatus: "pending",
-        },
-      },
-      input.manager,
-    );
-
-    const preference = await this.mercadoPagoService.createMarketplacePreference({
-      accessToken: settings.mercadoPagoAccessToken,
+    const idempotencyKey = `payment_intent:${input.booking.id}`;
+    const transaction = await this.paymentTransactionsRepository.create({
+      organizationId: input.booking.organizationId,
       bookingId: input.booking.id,
-      title: input.serviceName ?? "Agendamento Hubly",
-      payerEmail: input.customerEmail ?? null,
-      amountCents: input.booking.discountedAmountCents,
-      platformCommissionCents: input.booking.platformCommissionCents,
-      notificationUrl: `${env.PUBLIC_API_BASE_URL}/v1/public/payments/mercado-pago/webhooks?bookingId=${encodeURIComponent(input.booking.id)}`,
-    });
-
-    const checkoutUrl = preference.init_point ?? preference.sandbox_init_point ?? null;
-
-    await this.paymentTransactionsRepository.updateGatewayResult(
-      transaction.id,
-      {
-        status: "pending",
-        mercadoPagoPreferenceId: preference.id,
-        checkoutUrl,
-        rawGatewayPayload: preference,
-      },
-      input.manager,
-    );
-
-    const updatedBooking = await this.bookingsRepository.updateInOrganization(
-      input.booking.organizationId,
-      input.booking.id,
-      {
-        paymentCheckoutUrl: checkoutUrl,
+      providerId: input.booking.providerId,
+      idempotencyKey,
+      breakdown: {
+        paymentType: input.booking.paymentType,
+        originalAmountCents: input.booking.originalAmountCents,
+        discountedAmountCents: input.booking.discountedAmountCents,
+        onlineDiscountCents: input.booking.onlineDiscountCents,
+        platformCommissionRateBps: STRIPE_PLATFORM_FEE_BPS,
+        platformCommissionCents: input.booking.platformCommissionCents,
+        providerNetAmountCents: input.booking.providerNetAmountCents,
         paymentStatus: "pending",
       },
-      input.manager,
-    );
+    }, input.manager);
+
+    await this.ledgerRepository.append({
+      organizationId: input.booking.organizationId,
+      providerId: input.booking.providerId,
+      bookingId: input.booking.id,
+      stripeAccountId,
+      type: "payment_created",
+      amountCents: input.booking.discountedAmountCents,
+      currency: "brl",
+      status: "pending",
+      metadata: {
+        originalAmountCents: input.booking.originalAmountCents,
+        discountedAmountCents: input.booking.discountedAmountCents,
+        onlineDiscountCents: input.booking.onlineDiscountCents,
+        platformCommissionCents: input.booking.platformCommissionCents,
+        providerNetAmountCents: input.booking.providerNetAmountCents,
+      },
+    }, input.manager);
+
+    const paymentIntent = await this.stripeService.createMarketplacePaymentIntent({
+      amountCents: input.booking.discountedAmountCents,
+      applicationFeeAmountCents: input.booking.platformCommissionCents,
+      stripeAccountId,
+      bookingId: input.booking.id,
+      organizationId: input.booking.organizationId,
+      providerId: input.booking.providerId,
+      customerEmail: input.customerEmail ?? null,
+      serviceName: input.serviceName ?? null,
+      idempotencyKey,
+    });
+
+    await this.paymentTransactionsRepository.updateGatewayResult(transaction.id, {
+      status: mapPaymentIntentStatus(paymentIntent.status),
+      stripePaymentIntentId: paymentIntent.id,
+      stripeChargeId: getLatestChargeId(paymentIntent),
+      clientSecret: paymentIntent.client_secret ?? null,
+      checkoutUrl: null,
+      rawGatewayPayload: paymentIntent,
+    }, input.manager);
+
+    const updatedBooking = await this.bookingsRepository.updateInOrganization(input.booking.organizationId, input.booking.id, {
+      paymentCheckoutUrl: null,
+      paymentStatus: "pending",
+    }, input.manager);
 
     if (!updatedBooking) {
       throw new AppError("bookings.not_found", "Booking not found.", 404);
     }
 
-    return updatedBooking;
+    return { ...updatedBooking, paymentClientSecret: paymentIntent.client_secret ?? null };
   }
 
-  public async handleMercadoPagoWebhook(input: MercadoPagoWebhookInput) {
-    const bookingId = input.bookingId;
-    if (!bookingId) {
-      throw new AppError("payments.booking_id_required", "Booking id is required for Mercado Pago webhook.", 400);
+  public async handleStripeWebhook(input: {
+    rawBody: Buffer;
+    signature?: string;
+  }): Promise<{ received: true; eventType: string; duplicate?: boolean }> {
+    const event = this.stripeService.constructWebhookEvent(input.rawBody, input.signature);
+    const started = await this.webhookEventsRepository.tryStartProcessing({
+      stripeEventId: event.id,
+      eventType: event.type,
+      payload: event,
+    });
+    if (!started) {
+      return { received: true, eventType: event.type, duplicate: true };
     }
 
-    return this.dataSource.transaction("SERIALIZABLE", async (manager) => {
-      const transaction = await this.paymentTransactionsRepository.findLatestByBookingId(bookingId, manager);
-      if (!transaction) {
-        throw new AppError("payments.transaction_not_found", "Payment transaction not found.", 404);
-      }
+    if (event.type === "payment_intent.succeeded") await this.handlePaymentIntentSucceeded(event, event.data.object as PaymentIntent);
+    if (event.type === "payment_intent.payment_failed") await this.handlePaymentIntentFailed(event, event.data.object as PaymentIntent);
+    if (event.type === "account.updated") await this.handleAccountUpdated(event, event.data.object as Account);
+    if (event.type === "payout.paid") await this.handlePayoutPaid(event);
+    if (event.type === "payout.failed") await this.handlePayoutFailed(event);
 
-      const settings = await this.organizationPaymentSettingsRepository.getOrCreateDefault(
-        transaction.organizationId,
-        manager,
-      );
+    await this.webhookEventsRepository.markProcessed(event.id);
+    return { received: true, eventType: event.type };
+  }
 
-      if (!settings.mercadoPagoAccessToken) {
-        throw new AppError("payments.organization_not_connected", "Organization Mercado Pago connection not found.", 409);
-      }
+  private async handlePaymentIntentSucceeded(event: Event, paymentIntent: PaymentIntent): Promise<void> {
+    await this.handlePaymentIntentTerminalEvent(event, paymentIntent, "approved", "payment_succeeded");
+  }
 
-      const paymentId = input.paymentId;
-      const payment = paymentId ? await this.mercadoPagoService.getPayment(settings.mercadoPagoAccessToken, paymentId) : null;
-      const paymentStatus = mapMercadoPagoStatus(payment?.status);
+  private async handlePaymentIntentFailed(event: Event, paymentIntent: PaymentIntent): Promise<void> {
+    await this.handlePaymentIntentTerminalEvent(event, paymentIntent, "rejected", "payment_failed");
+  }
 
-      await this.paymentTransactionsRepository.updateGatewayResult(
-        transaction.id,
-        {
-          status: paymentStatus,
-          mercadoPagoPaymentId: payment ? String(payment.id) : paymentId ?? null,
-          rawGatewayPayload: payment ?? input.payload,
-        },
-        manager,
-      );
+  private async handlePaymentIntentTerminalEvent(
+    event: Event,
+    paymentIntent: PaymentIntent,
+    paymentStatus: BookingPaymentStatus,
+    ledgerType: "payment_succeeded" | "payment_failed",
+  ): Promise<void> {
+    await this.dataSource.transaction("SERIALIZABLE", async (manager) => {
+      const transaction = await this.paymentTransactionsRepository.findByStripePaymentIntentId(paymentIntent.id, manager);
+      if (!transaction) throw new AppError("payments.transaction_not_found", "Payment transaction not found.", 404);
 
-      const bookingUpdate = {
+      this.validatePaymentIntentAgainstTransaction(paymentIntent, transaction);
+      await this.paymentTransactionsRepository.updateGatewayResult(transaction.id, {
+        status: paymentStatus,
+        stripePaymentIntentId: paymentIntent.id,
+        stripeChargeId: getLatestChargeId(paymentIntent),
+        rawGatewayPayload: paymentIntent,
+      }, manager);
+
+      const booking = await this.bookingsRepository.updateInOrganization(transaction.organizationId, transaction.bookingId, {
         paymentStatus,
         ...(paymentStatus === "approved" ? { status: "confirmed" as const } : {}),
-      };
+      }, manager);
+      if (!booking) throw new AppError("bookings.not_found", "Booking not found.", 404);
 
-      const booking = await this.bookingsRepository.updateInOrganization(
-        transaction.organizationId,
-        bookingId,
-        bookingUpdate,
-        manager,
-      );
-
-      if (!booking) {
-        throw new AppError("bookings.not_found", "Booking not found.", 404);
-      }
-
-      await this.auditRepository.create(
-        {
-          organizationId: transaction.organizationId,
-          actorId: null,
-          action: `payment.${paymentStatus}`,
-          targetType: "booking",
-          targetId: bookingId,
-        },
-        manager,
-      );
+      await this.ledgerRepository.append({
+        organizationId: transaction.organizationId,
+        providerId: transaction.providerId,
+        bookingId: transaction.bookingId,
+        stripeAccountId: String(paymentIntent.transfer_data?.destination ?? ""),
+        stripeObjectId: paymentIntent.id,
+        stripeEventId: event.id,
+        type: ledgerType,
+        amountCents: paymentIntent.amount,
+        currency: paymentIntent.currency,
+        status: paymentStatus,
+        failureReason: paymentIntent.last_payment_error?.message ?? null,
+      }, manager);
 
       if (paymentStatus === "approved") {
-        await this.notificationsService.handleBookingEvent(
-          {
-            id: "payment-webhook",
-            organizationId: transaction.organizationId,
-            role: "administrator",
-            sessionId: "payment-webhook",
-          },
-          {
-            type: "booking.confirmed",
-            booking,
-          },
-          manager,
-        );
+        await this.notificationsService.handleBookingEvent({
+          id: "stripe-webhook",
+          organizationId: transaction.organizationId,
+          role: "administrator",
+          sessionId: "stripe-webhook",
+        }, { type: "booking.confirmed", booking }, manager);
       }
-
-      return { received: true, bookingId, paymentStatus };
     });
   }
 
-  private async ensureProvider(organizationId: string, providerId: string): Promise<void> {
-    const provider = await this.providersRepository.findByIdInOrganization(organizationId, providerId);
-    if (!provider) {
-      throw new AppError("providers.not_found", "Provider not found.", 404);
+  private async handleAccountUpdated(event: Event, account: Account): Promise<void> {
+    const organizationSettings = await this.organizationPaymentSettingsRepository.findByStripeAccountId(account.id);
+    if (organizationSettings) {
+      const status = await this.saveOrganizationStripeAccountSnapshot(organizationSettings.organizationId, this.stripeService.toAccountSnapshot(account));
+      await this.ledgerRepository.append({
+        organizationId: organizationSettings.organizationId,
+        providerId: null,
+        stripeAccountId: account.id,
+        stripeObjectId: account.id,
+        stripeEventId: event.id,
+        type: status === "verified" ? "account_verified" : "account_restricted",
+        amountCents: 0,
+        currency: "brl",
+        status,
+        failureReason: account.requirements?.disabled_reason ?? null,
+      });
+      return;
     }
+
+    const provider = await this.providersRepository.findByStripeAccountId(account.id);
+    if (!provider) return;
+    const status = await this.saveStripeAccountSnapshot(provider.organizationId, provider.id, this.stripeService.toAccountSnapshot(account));
+    await this.ledgerRepository.append({
+      organizationId: provider.organizationId,
+      providerId: provider.id,
+      stripeAccountId: account.id,
+      stripeObjectId: account.id,
+      stripeEventId: event.id,
+      type: status === "verified" ? "account_verified" : "account_restricted",
+      amountCents: 0,
+      currency: "brl",
+      status,
+      failureReason: account.requirements?.disabled_reason ?? null,
+    });
+  }
+
+  private async handlePayoutPaid(event: Event): Promise<void> {
+    await this.handlePayoutTerminalEvent(event, "paid", "payout_paid");
+  }
+
+  private async handlePayoutFailed(event: Event): Promise<void> {
+    await this.handlePayoutTerminalEvent(event, "failed", "payout_failed");
+  }
+
+  private async handlePayoutTerminalEvent(event: Event, status: "paid" | "failed", ledgerType: "payout_paid" | "payout_failed"): Promise<void> {
+    const payout = event.data.object as Payout;
+    const stripeAccountId = event.account;
+    if (!stripeAccountId) return;
+    const organizationSettings = await this.organizationPaymentSettingsRepository.findByStripeAccountId(stripeAccountId);
+    const provider = organizationSettings ? null : await this.providersRepository.findByStripeAccountId(stripeAccountId);
+    if (!organizationSettings && !provider) return;
+    const organizationId = organizationSettings?.organizationId ?? provider?.organizationId;
+    if (!organizationId) return;
+    const current = await this.providerPayoutsRepository.findByStripePayoutId(payout.id);
+    if (current) {
+      await this.providerPayoutsRepository.updateStripeResult({
+        id: current.id,
+        stripePayoutId: payout.id,
+        status,
+        failureReason: payout.failure_message ?? null,
+      });
+    }
+    await this.ledgerRepository.append({
+      organizationId,
+      providerId: provider?.id ?? null,
+      payoutId: current?.id ?? null,
+      stripeAccountId,
+      stripeObjectId: payout.id,
+      stripeEventId: event.id,
+      type: ledgerType,
+      amountCents: payout.amount,
+      currency: payout.currency,
+      status,
+      failureReason: payout.failure_message ?? null,
+    });
+  }
+
+  private validatePaymentIntentAgainstTransaction(paymentIntent: PaymentIntent, transaction: {
+    organizationId: string;
+    providerId: string;
+    bookingId: string;
+    discountedAmountCents: number;
+    platformCommissionCents: number;
+  }): void {
+    if (
+      paymentIntent.metadata?.bookingId !== transaction.bookingId
+      || paymentIntent.metadata?.providerId !== transaction.providerId
+      || paymentIntent.metadata?.organizationId !== transaction.organizationId
+      || paymentIntent.amount !== transaction.discountedAmountCents
+      || paymentIntent.application_fee_amount !== transaction.platformCommissionCents
+    ) {
+      throw new AppError("payments.invalid_webhook_metadata", "Os dados da confirmação de pagamento não correspondem à transação registrada.", 409);
+    }
+  }
+
+  private async getProvider(organizationId: string, providerId: string, manager?: EntityManager): Promise<Provider> {
+    const provider = await this.providersRepository.findByIdInOrganization(organizationId, providerId, manager);
+    if (!provider) throw new AppError("providers.not_found", "Provider not found.", 404);
+    return provider;
+  }
+
+  private async ensureFinancialAccess(user: AuthenticatedRequestUser, providerId: string): Promise<Provider> {
+    if (user.role === "provider" && user.providerId !== providerId) {
+      throw new AppError("auth.forbidden", "Provider cannot access another provider financial data.", 403);
+    }
+    return this.getProvider(user.organizationId, providerId);
+  }
+
+  private ensureAdministrator(user: AuthenticatedRequestUser): void {
+    if (user.role !== "administrator") {
+      throw new AppError("auth.forbidden", "Somente administradores podem gerenciar a conta de pagamentos.", 403);
+    }
+  }
+
+  private requireStripeAccount(provider: Provider): string {
+    if (!provider.stripeAccountId) throw new AppError("payments.stripe_account_required", "A verificação de identidade precisa ser concluída antes.", 409);
+    return provider.stripeAccountId;
+  }
+
+  private async requireOrganizationStripeAccount(organizationId: string, manager?: EntityManager): Promise<string> {
+    const settings = await this.organizationPaymentSettingsRepository.getOrCreateDefault(organizationId, manager);
+    if (!settings.stripeAccountId) {
+      throw new AppError("payments.stripe_account_required", "A organização precisa concluir a verificação de identidade antes.", 409);
+    }
+    return settings.stripeAccountId;
+  }
+
+  private buildAccountStatusResponse(subject: { organizationId?: string; providerId?: string }, account: {
+    chargesEnabled: boolean;
+    payoutsEnabled: boolean;
+    detailsSubmitted: boolean;
+    currentlyDue: string[];
+    eventuallyDue: string[];
+    pastDue: string[];
+    disabledReason?: string | null;
+    status: StripeAccountStatus;
+  }): StripeAccountStatusResponse {
+    const blockedReasons = [
+      ...(!account.detailsSubmitted ? ["kyc_details_missing"] : []),
+      ...(!account.chargesEnabled ? ["charges_not_enabled"] : []),
+      ...(!account.payoutsEnabled ? ["payouts_not_enabled"] : []),
+      ...(account.disabledReason ? [account.disabledReason] : []),
+      ...account.currentlyDue,
+      ...account.pastDue,
+    ];
+
+    return {
+      ...subject,
+      status: account.status,
+      chargesEnabled: account.chargesEnabled,
+      payoutsEnabled: account.payoutsEnabled,
+      detailsSubmitted: account.detailsSubmitted,
+      currentlyDue: account.currentlyDue,
+      eventuallyDue: account.eventuallyDue,
+      pastDue: account.pastDue,
+      disabledReason: account.disabledReason ?? null,
+      canReceivePayments: account.status === "verified",
+      canRequestPayouts: account.status === "verified",
+      blockedReasons,
+    };
+  }
+
+  private assertVerifiedAccount(account: { status: StripeAccountStatus }, operation: "payment" | "payout"): void {
+    if (account.status !== "verified") {
+      throw new AppError(
+        operation === "payment" ? "payments.provider_not_eligible" : "payments.payout_account_not_verified",
+        operation === "payment"
+          ? "A conta de pagamentos ainda não está apta para receber pagamentos online."
+          : "A conta de pagamentos precisa estar verificada antes de solicitar saques.",
+        409,
+      );
+    }
+  }
+
+  private async saveStripeAccountSnapshot(
+    organizationId: string,
+    providerId: string,
+    account: {
+      chargesEnabled: boolean;
+      payoutsEnabled: boolean;
+      detailsSubmitted: boolean;
+      currentlyDue: string[];
+      eventuallyDue: string[];
+      pastDue: string[];
+      disabledReason?: string | null;
+      status: StripeAccountStatus;
+    },
+    manager?: EntityManager,
+  ): Promise<StripeAccountStatus> {
+    await this.providerPaymentSettingsRepository.updateStripeAccountStatus(organizationId, providerId, {
+      chargesEnabled: account.chargesEnabled,
+      payoutsEnabled: account.payoutsEnabled,
+      detailsSubmitted: account.detailsSubmitted,
+      currentlyDue: account.currentlyDue,
+      eventuallyDue: account.eventuallyDue,
+      pastDue: account.pastDue,
+      disabledReason: account.disabledReason ?? null,
+      accountStatus: account.status,
+    }, manager);
+    return account.status;
+  }
+
+  private async saveOrganizationStripeAccountSnapshot(
+    organizationId: string,
+    account: {
+      chargesEnabled: boolean;
+      payoutsEnabled: boolean;
+      detailsSubmitted: boolean;
+      currentlyDue: string[];
+      eventuallyDue: string[];
+      pastDue: string[];
+      disabledReason?: string | null;
+      status: StripeAccountStatus;
+    },
+    manager?: EntityManager,
+  ): Promise<StripeAccountStatus> {
+    await this.organizationPaymentSettingsRepository.updateStripeAccountStatus(organizationId, {
+      chargesEnabled: account.chargesEnabled,
+      payoutsEnabled: account.payoutsEnabled,
+      detailsSubmitted: account.detailsSubmitted,
+      currentlyDue: account.currentlyDue,
+      eventuallyDue: account.eventuallyDue,
+      pastDue: account.pastDue,
+      disabledReason: account.disabledReason ?? null,
+      accountStatus: account.status,
+    }, manager);
+    return account.status;
+  }
+
+  private async getExistingStripeAccount(user: AuthenticatedRequestUser, providerId: string): Promise<StripeConnectAccount> {
+    const provider = await this.ensureFinancialAccess(user, providerId);
+    const stripeAccountId = this.requireStripeAccount(provider);
+    const account = await this.stripeService.retrieveAccount(stripeAccountId);
+    await this.saveStripeAccountSnapshot(user.organizationId, providerId, account);
+    return {
+      providerId,
+      stripeAccountId,
+      chargesEnabled: account.chargesEnabled,
+      payoutsEnabled: account.payoutsEnabled,
+      detailsSubmitted: account.detailsSubmitted,
+    };
   }
 
   private async resolveOfferingPrice(
@@ -334,15 +879,11 @@ export class PaymentsService {
     offeringId: string | null,
     manager?: EntityManager,
   ): Promise<number> {
-    if (!offeringId) {
-      return 0;
-    }
-
+    if (!offeringId) return 0;
     const offering = await this.serviceOfferingsRepository.findByIdInOrganization(organizationId, offeringId, manager);
     if (!offering || offering.providerId !== providerId || !offering.isActive) {
       throw new AppError("service_offerings.not_found", "Service offering not found.", 404);
     }
-
     return offering.priceCents ?? 0;
   }
 }

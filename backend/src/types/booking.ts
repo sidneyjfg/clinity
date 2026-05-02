@@ -32,6 +32,7 @@ export type Booking = {
   providerNetAmountCents: number;
   paymentStatus: BookingPaymentStatus;
   paymentCheckoutUrl?: string | null;
+  paymentClientSecret?: string | null;
 };
 
 export type BookingWriteInput = {

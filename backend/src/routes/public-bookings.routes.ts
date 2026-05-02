@@ -64,4 +64,7 @@ export const publicBookingsRoutes = async (
   app.get("/public/organizations/:slug", { schema: publicBookingPageRouteSchema }, controller.getBookingPage);
   app.get("/public/organizations/:slug/availability", { schema: publicBookingAvailabilityRouteSchema }, controller.getAvailability);
   app.post("/public/organizations/:slug/bookings", { schema: publicBookingCreateRouteSchema }, controller.createBooking);
+  app.post("/public/customers/sign-up", controller.signUpCustomer);
+  app.post("/public/customers/sign-in", controller.signInCustomer);
+  app.get("/public/customers/me", controller.getCustomerPortal);
 };

@@ -14,8 +14,10 @@ import { ServiceOfferingsRepository } from "../repositories/service-offerings.re
 import type { Booking, BookingAvailabilityQuery } from "../types/booking";
 import type { PublicAvailableSlot, PublicBookingPage, PublicBookingRequestInput } from "../types/provider";
 import { AppError } from "../utils/app-error";
-import { hashPassword } from "../utils/password";
+import { hashPassword, verifyPassword } from "../utils/password";
 import { buildAvailableSlots, isWithinProviderAvailability, resolveWeekday } from "../utils/provider-availability";
+import { env } from "../utils/env";
+import { createCustomerAccessToken, verifyCustomerAccessToken } from "../utils/customer-tokens";
 import { EvolutionWhatsAppService } from "./evolution-whatsapp.service";
 import { NotificationsService } from "./notifications.service";
 import { PaymentsService } from "./payments.service";
@@ -25,7 +27,8 @@ const publicBookingRequestSchema = z.object({
   fullName: z.string().min(3).max(120),
   email: z.string().email().nullable().optional(),
   phone: z.string().min(10).max(30),
-  password: z.string().min(8).max(120),
+  password: z.string().min(8).max(120).optional(),
+  customerAccessToken: z.string().min(20).optional(),
   providerId: z.string().min(3),
   offeringId: z.string().min(3).nullable().optional(),
   startsAt: z.string().datetime(),
@@ -39,6 +42,29 @@ const availabilityQuerySchema = z.object({
   date: z.string().date(),
   offeringId: z.string().min(3).nullable().optional(),
 });
+
+const customerSignUpSchema = z.object({
+  slug: z.string().min(3),
+  fullName: z.string().min(3).max(120),
+  email: z.string().email().nullable().optional(),
+  phone: z.string().min(10).max(30),
+  password: z.string().min(8).max(120),
+});
+
+const customerSignInSchema = z.object({
+  emailOrPhone: z.string().min(5).max(160),
+  password: z.string().min(8).max(120),
+});
+
+type CustomerPortalSession = {
+  accessToken: string;
+  customer: {
+    id: string;
+    fullName: string;
+    email?: string | null;
+    phone: string;
+  };
+};
 
 export class PublicBookingsService {
   public constructor(
@@ -175,13 +201,12 @@ export class PublicBookingsService {
         return;
       }
 
-      const [paymentSettings, availability] = await Promise.all([
-        this.organizationPaymentSettingsRepository.findByOrganization(organizationId),
-        this.providerAvailabilitiesRepository.findByProviderInOrganization(organizationId, provider.id),
-      ]);
-
+      const availability = await this.providerAvailabilitiesRepository.findByProviderInOrganization(organizationId, provider.id);
       const hasActiveAvailability = availability.some((item) => item.isActive);
-      if (paymentSettings?.mercadoPagoConnected && paymentSettings.mercadoPagoAccessToken && hasActiveAvailability) {
+
+      if (hasActiveAvailability) {
+        // Agora permitimos se houver disponibilidade ativa. 
+        // A decisão de mostrar "Online" ou apenas "Presencial" será feita no frontend baseada nas settings.
         readyProviderIds.add(provider.id);
       }
     }));
@@ -237,6 +262,145 @@ export class PublicBookingsService {
     };
   }
 
+  public async signUpCustomer(input: unknown): Promise<CustomerPortalSession> {
+    const data = customerSignUpSchema.parse(input);
+    const organization = await this.organizationsRepository.findByBookingPageSlug(data.slug);
+    if (!organization) {
+      throw new AppError("public_booking.organization_not_found", "Estabelecimento não encontrado.", 404);
+    }
+
+    const passwordHash = hashPassword(data.password);
+    const customer = await this.dataSource.transaction("SERIALIZABLE", async (manager) => {
+      const existingCustomer = await this.customersRepository.findAuthCandidateInOrganization(
+        organization.id,
+        { email: data.email ?? null, phone: data.phone },
+        manager,
+      );
+
+      if (existingCustomer?.passwordHash && !verifyPassword(data.password, existingCustomer.passwordHash)) {
+        throw new AppError("customer_auth.account_exists", "Já existe uma conta com estes dados. Entre com sua senha atual.", 409);
+      }
+
+      if (existingCustomer) {
+        await this.customersRepository.setPasswordHashIfMissing(organization.id, existingCustomer.id, passwordHash, manager);
+        return existingCustomer;
+      }
+
+      return this.customersRepository.create(
+        organization.id,
+        {
+          fullName: data.fullName,
+          email: data.email ?? null,
+          phone: data.phone,
+          passwordHash,
+        },
+        manager,
+      );
+    });
+
+    return this.buildCustomerSession(customer);
+  }
+
+  public async signInCustomer(input: unknown): Promise<CustomerPortalSession> {
+    const data = customerSignInSchema.parse(input);
+    const candidates = await this.customersRepository.findAuthCandidatesByEmailOrPhone(data.emailOrPhone);
+    const customer = candidates.find((candidate) => candidate.passwordHash && verifyPassword(data.password, candidate.passwordHash));
+
+    if (!customer) {
+      throw new AppError("customer_auth.invalid_credentials", "E-mail, telefone ou senha inválidos.", 401);
+    }
+
+    return this.buildCustomerSession(customer);
+  }
+
+  public async getCustomerPortal(authorization?: string): Promise<{
+    customer: CustomerPortalSession["customer"];
+    bookings: Array<Booking & { organizationName: string; organizationSlug: string }>;
+    places: Array<{
+      organizationId: string;
+      organizationName: string;
+      organizationSlug: string;
+      visits: number;
+      spentCents: number;
+      lastVisitAt: string;
+    }>;
+  }> {
+    const claims = this.requireCustomerClaims(authorization);
+    const bookings = await this.bookingsRepository.findByCustomerIdentity({
+      email: claims.email ?? null,
+      phone: claims.phone,
+    });
+    const matchingCustomers = await this.customersRepository.findByPortalIdentity({
+      email: claims.email ?? null,
+      phone: claims.phone,
+    });
+    const primaryCustomer = matchingCustomers.find((item) => item.id === claims.sub) ?? matchingCustomers[0];
+
+    const placesById = new Map<string, {
+      organizationId: string;
+      organizationName: string;
+      organizationSlug: string;
+      visits: number;
+      spentCents: number;
+      lastVisitAt: string;
+    }>();
+
+    bookings.forEach((booking) => {
+      const current = placesById.get(booking.organizationId) ?? {
+        organizationId: booking.organizationId,
+        organizationName: booking.organizationName,
+        organizationSlug: booking.organizationSlug,
+        visits: 0,
+        spentCents: 0,
+        lastVisitAt: booking.startsAt,
+      };
+
+      current.visits += 1;
+      current.spentCents += booking.status !== "cancelled" && !["cancelled", "rejected"].includes(booking.paymentStatus)
+        ? booking.discountedAmountCents
+        : 0;
+      if (booking.startsAt > current.lastVisitAt) {
+        current.lastVisitAt = booking.startsAt;
+      }
+      placesById.set(booking.organizationId, current);
+    });
+
+    return {
+      customer: {
+        id: primaryCustomer?.id ?? claims.sub,
+        fullName: primaryCustomer?.fullName ?? "Cliente",
+        email: primaryCustomer?.email ?? claims.email ?? null,
+        phone: primaryCustomer?.phone ?? claims.phone,
+      },
+      bookings,
+      places: [...placesById.values()].sort((a, b) => b.lastVisitAt.localeCompare(a.lastVisitAt)),
+    };
+  }
+
+  private buildCustomerSession(customer: { id: string; fullName: string; email?: string | null; phone: string }): CustomerPortalSession {
+    return {
+      accessToken: createCustomerAccessToken({
+        sub: customer.id,
+        email: customer.email ?? null,
+        phone: customer.phone,
+      }),
+      customer: {
+        id: customer.id,
+        fullName: customer.fullName,
+        email: customer.email ?? null,
+        phone: customer.phone,
+      },
+    };
+  }
+
+  private requireCustomerClaims(authorization?: string) {
+    if (!authorization?.startsWith("Bearer ")) {
+      throw new AppError("customer_auth.unauthorized", "Faça login novamente.", 401);
+    }
+
+    return verifyCustomerAccessToken(authorization.slice("Bearer ".length));
+  }
+
   public async createBooking(slug: string, input: PublicBookingRequestInput): Promise<Booking> {
     const organization = await this.organizationsRepository.findByBookingPageSlug(slug);
     if (!organization) {
@@ -251,6 +415,18 @@ export class PublicBookingsService {
       paymentType: input.paymentType ?? "presential",
     });
 
+    if (!data.password && !data.customerAccessToken) {
+      throw new AppError("customer_auth.required", "Crie uma conta ou entre antes de agendar.", 400);
+    }
+
+    if (data.customerAccessToken) {
+      const claims = verifyCustomerAccessToken(data.customerAccessToken);
+      const emailMatches = data.email && claims.email && data.email === claims.email;
+      if (claims.phone !== data.phone && !emailMatches) {
+        throw new AppError("customer_auth.invalid_session", "A sessão do cliente não corresponde aos dados informados.", 401);
+      }
+    }
+
     const startsAt = new Date(data.startsAt);
     const endsAt = new Date(data.endsAt);
 
@@ -258,7 +434,7 @@ export class PublicBookingsService {
       throw new AppError("bookings.invalid_window", "Invalid booking window.", 400);
     }
 
-    return this.dataSource.transaction("SERIALIZABLE", async (manager) => {
+    const result = await this.dataSource.transaction("SERIALIZABLE", async (manager) => {
       const provider = await this.providersRepository.findByIdInOrganization(organization.id, data.providerId, manager);
       if (!provider || !provider.isActive) {
         throw new AppError("providers.not_found", "Provider not found.", 404);
@@ -283,6 +459,10 @@ export class PublicBookingsService {
           throw new AppError("service_offerings.not_found", "Service offering not found.", 404);
         }
 
+        if (offering.requireOnlinePayment && data.paymentType === "presential") {
+          throw new AppError("bookings.online_payment_required", "Este serviço exige pagamento online antecipado.", 400);
+        }
+
         serviceName = offering.name;
       }
 
@@ -298,7 +478,7 @@ export class PublicBookingsService {
         throw new AppError("bookings.time_conflict", "Selected time is no longer available.", 409);
       }
 
-      const customerPasswordHash = hashPassword(data.password);
+      const customerPasswordHash = data.password ? hashPassword(data.password) : null;
       const existingCustomer = await this.customersRepository.findByPhoneOrEmailInOrganization(
         organization.id,
         { email: data.email ?? null, phone: data.phone },
@@ -310,12 +490,12 @@ export class PublicBookingsService {
           fullName: data.fullName,
           email: data.email ?? null,
           phone: data.phone,
-          passwordHash: customerPasswordHash,
+          passwordHash: customerPasswordHash ?? null,
         },
         manager,
       );
 
-      if (existingCustomer) {
+      if (existingCustomer && customerPasswordHash) {
         await this.customersRepository.setPasswordHashIfMissing(
           organization.id,
           existingCustomer.id,
@@ -343,7 +523,7 @@ export class PublicBookingsService {
           paymentStatus: data.paymentType === "online" ? "pending" as const : "pending_local" as const,
         };
 
-      let booking = await this.bookingsRepository.create(
+      const booking = await this.bookingsRepository.create(
         {
           organizationId: organization.id,
           customerId: customer.id,
@@ -358,19 +538,6 @@ export class PublicBookingsService {
         },
         manager,
       );
-
-      if (data.paymentType === "online") {
-        if (!this.paymentsService) {
-          throw new AppError("payments.unavailable", "Payments service unavailable.", 500);
-        }
-
-        booking = await this.paymentsService.prepareOnlinePayment({
-          booking,
-          ...(customer.email === undefined ? {} : { customerEmail: customer.email }),
-          serviceName,
-          manager,
-        });
-      }
 
       await this.auditRepository.create(
         {
@@ -397,7 +564,25 @@ export class PublicBookingsService {
         manager,
       );
 
-      return booking;
+      return {
+        booking,
+        customerEmail: customer.email,
+        serviceName,
+      };
+    });
+
+    if (data.paymentType !== "online") {
+      return result.booking;
+    }
+
+    if (!this.paymentsService) {
+      throw new AppError("payments.unavailable", "Payments service unavailable.", 500);
+    }
+
+    return this.paymentsService.prepareOnlinePayment({
+      booking: result.booking,
+      ...(result.customerEmail === undefined ? {} : { customerEmail: result.customerEmail }),
+      serviceName: result.serviceName,
     });
   }
 }

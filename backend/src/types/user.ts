@@ -5,6 +5,7 @@ export type User = {
   email: string;
   phone: string;
   role: "administrator" | "reception" | "provider";
+  providerId?: string | null;
   isActive: boolean;
   createdAt: string;
 };

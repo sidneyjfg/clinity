@@ -86,6 +86,52 @@ export class CustomersRepository {
     return customer ? this.mapCustomer(customer) : null;
   }
 
+  public async findAuthCandidatesByEmailOrPhone(identifier: string): Promise<Array<Customer & { passwordHash: string | null }>> {
+    const normalizedIdentifier = identifier.trim();
+    const customers = await this.getRepository()
+      .createQueryBuilder("customer")
+      .where("customer.email = :identifier OR customer.phone = :identifier", {
+        identifier: normalizedIdentifier,
+      })
+      .orderBy("customer.createdAt", "DESC")
+      .getMany();
+
+    return customers.map((customer) => ({
+      ...this.mapCustomer(customer),
+      passwordHash: customer.passwordHash,
+    }));
+  }
+
+  public async findAuthCandidateInOrganization(
+    organizationId: string,
+    input: { email?: string | null; phone: string },
+    manager?: EntityManager,
+  ): Promise<(Customer & { passwordHash: string | null }) | null> {
+    const repository = this.getRepository(manager);
+    const customer = await repository
+      .createQueryBuilder("customer")
+      .where("customer.organizationId = :organizationId", { organizationId })
+      .andWhere("(customer.phone = :phone OR customer.email = :email)", {
+        phone: input.phone,
+        email: input.email ?? null,
+      })
+      .orderBy("customer.createdAt", "DESC")
+      .getOne();
+
+    return customer ? { ...this.mapCustomer(customer), passwordHash: customer.passwordHash } : null;
+  }
+
+  public async findByPortalIdentity(input: { email?: string | null; phone: string }): Promise<Customer[]> {
+    const customers = await this.getRepository()
+      .createQueryBuilder("customer")
+      .where("customer.phone = :phone", { phone: input.phone })
+      .orWhere(input.email ? "customer.email = :email" : "1 = 0", { email: input.email ?? "" })
+      .orderBy("customer.createdAt", "DESC")
+      .getMany();
+
+    return customers.map((customer) => this.mapCustomer(customer));
+  }
+
   public async setPasswordHashIfMissing(
     organizationId: string,
     id: string,

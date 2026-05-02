@@ -12,6 +12,19 @@ export type SystemAdminSummary = {
   users: number;
 };
 
+export type SystemAdminMarketplaceAudit = {
+  organizationId: string;
+  organizationName: string;
+  onlineRevenueCents: number;
+  onlineCommissionCents: number;
+  presentialRevenueCents: number;
+  presentialCommissionCents: number;
+  onlineCount: number;
+  presentialCount: number;
+  pendingStatusCount: number;
+  presentialRatio: number;
+};
+
 export type SystemAdminAuditEvent = {
   action: string;
   actorId: string;
@@ -133,6 +146,12 @@ export const systemAdminApi = {
         organizationId: query.organizationId,
         page: query.page?.toString()
       }
+    });
+  },
+
+  getMarketplaceAudit(session: SystemAdminSession) {
+    return systemAdminRequest<SystemAdminMarketplaceAudit[]>("/v1/system-admin/marketplace-audit", {
+      session
     });
   }
 };

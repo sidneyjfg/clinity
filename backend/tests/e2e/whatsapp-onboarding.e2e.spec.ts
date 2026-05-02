@@ -47,17 +47,26 @@ describe("WhatsApp onboarding E2E", () => {
 
     global.fetch = vi.fn()
       .mockResolvedValueOnce({
-        ok: true,
+        ok: false, // getStatus inicial para verificar se existe
+        status: 404,
+        text: async () => JSON.stringify({}),
+      })
+      .mockResolvedValueOnce({
+        ok: true, // createInstance
         text: async () =>
           JSON.stringify({
             instance: {
               instanceName: "organization-cln_main_001",
-              status: "close",
+              status: "created",
             },
           }),
       })
       .mockResolvedValueOnce({
-        ok: true,
+        ok: true, // setPairingCodeMode
+        text: async () => JSON.stringify({}),
+      })
+      .mockResolvedValueOnce({
+        ok: true, // getStatus dentro do startSession
         text: async () =>
           JSON.stringify({
             instance: {
@@ -67,7 +76,11 @@ describe("WhatsApp onboarding E2E", () => {
           }),
       })
       .mockResolvedValueOnce({
-        ok: true,
+        ok: true, // setPairingCodeMode dentro do startSession
+        text: async () => JSON.stringify({}),
+      })
+      .mockResolvedValueOnce({
+        ok: true, // connect
         text: async () =>
           JSON.stringify({
             pairingCode: "ABC12345",
@@ -75,7 +88,7 @@ describe("WhatsApp onboarding E2E", () => {
           }),
       })
       .mockResolvedValueOnce({
-        ok: true,
+        ok: true, // getStatus final do startSession
         text: async () =>
           JSON.stringify({
             instance: {
@@ -85,7 +98,7 @@ describe("WhatsApp onboarding E2E", () => {
           }),
       })
       .mockResolvedValueOnce({
-        ok: true,
+        ok: true, // getStatus para o check final
         text: async () =>
           JSON.stringify({
             instance: {
@@ -95,7 +108,7 @@ describe("WhatsApp onboarding E2E", () => {
           }),
       })
       .mockResolvedValueOnce({
-        ok: true,
+        ok: true, // sendText
         text: async () =>
           JSON.stringify({
             status: "PENDING",

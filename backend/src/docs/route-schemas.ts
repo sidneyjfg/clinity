@@ -247,6 +247,7 @@ const bookingSchema = {
       enum: ["not_required", "pending", "approved", "rejected", "cancelled", "pending_local"],
     },
     paymentCheckoutUrl: { type: ["string", "null"] },
+    paymentClientSecret: { type: ["string", "null"] },
   },
 } as const;
 

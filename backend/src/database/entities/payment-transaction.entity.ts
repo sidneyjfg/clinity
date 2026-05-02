@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryColumn, UpdateDateColumn } from "typeorm";
+import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryColumn, Unique, UpdateDateColumn } from "typeorm";
 
 import { BookingEntity } from "./booking.entity";
 import { OrganizationEntity } from "./organization.entity";
@@ -6,7 +6,9 @@ import { ProviderEntity } from "./provider.entity";
 
 @Entity({ name: "payment_transactions" })
 @Index("idx_payment_transactions_booking_id", ["bookingId"])
-@Index("idx_payment_transactions_mp_payment_id", ["mercadoPagoPaymentId"])
+@Index("idx_payment_transactions_stripe_payment_intent_id", ["stripePaymentIntentId"])
+@Unique("uq_payment_transactions_stripe_payment_intent_id", ["stripePaymentIntentId"])
+@Unique("uq_payment_transactions_idempotency_key", ["idempotencyKey"])
 export class PaymentTransactionEntity {
   @PrimaryColumn({ type: "varchar", length: 36 })
   public id!: string;
@@ -35,11 +37,17 @@ export class PaymentTransactionEntity {
   @Column({ type: "varchar", length: 32 })
   public status!: string;
 
-  @Column({ type: "varchar", length: 120, nullable: true })
-  public mercadoPagoPreferenceId!: string | null;
+  @Column({ name: "stripe_payment_intent_id", type: "varchar", length: 120, nullable: true })
+  public stripePaymentIntentId!: string | null;
 
-  @Column({ type: "varchar", length: 120, nullable: true })
-  public mercadoPagoPaymentId!: string | null;
+  @Column({ name: "stripe_charge_id", type: "varchar", length: 120, nullable: true })
+  public stripeChargeId!: string | null;
+
+  @Column({ type: "varchar", length: 160, nullable: true })
+  public idempotencyKey!: string | null;
+
+  @Column({ type: "varchar", length: 500, nullable: true })
+  public clientSecret!: string | null;
 
   @Column({ type: "int" })
   public originalAmountCents!: number;

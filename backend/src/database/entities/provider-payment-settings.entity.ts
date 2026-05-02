@@ -24,20 +24,29 @@ export class ProviderPaymentSettingsEntity {
   @Column({ type: "boolean", default: true })
   public absorbsProcessingFee!: boolean;
 
-  @Column({ type: "boolean", default: false })
-  public mercadoPagoConnected!: boolean;
+  @Column({ name: "stripe_charges_enabled", type: "boolean", default: false })
+  public stripeChargesEnabled!: boolean;
 
-  @Column({ type: "varchar", length: 120, nullable: true })
-  public mercadoPagoUserId!: string | null;
+  @Column({ name: "stripe_payouts_enabled", type: "boolean", default: false })
+  public stripePayoutsEnabled!: boolean;
 
-  @Column({ type: "varchar", length: 1000, nullable: true })
-  public mercadoPagoAccessToken!: string | null;
+  @Column({ name: "stripe_details_submitted", type: "boolean", default: false })
+  public stripeDetailsSubmitted!: boolean;
 
-  @Column({ type: "varchar", length: 1000, nullable: true })
-  public mercadoPagoRefreshToken!: string | null;
+  @Column({ name: "stripe_currently_due", type: "json", nullable: true })
+  public stripeCurrentlyDue!: string[] | null;
 
-  @Column({ type: "datetime", nullable: true })
-  public mercadoPagoTokenExpiresAt!: Date | null;
+  @Column({ name: "stripe_eventually_due", type: "json", nullable: true })
+  public stripeEventuallyDue!: string[] | null;
+
+  @Column({ name: "stripe_past_due", type: "json", nullable: true })
+  public stripePastDue!: string[] | null;
+
+  @Column({ name: "stripe_disabled_reason", type: "varchar", length: 255, nullable: true })
+  public stripeDisabledReason!: string | null;
+
+  @Column({ name: "stripe_account_status", type: "varchar", length: 32, default: "pending" })
+  public stripeAccountStatus!: string;
 
   @CreateDateColumn({ type: "datetime" })
   public createdAt!: Date;

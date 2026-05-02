@@ -4,6 +4,7 @@ export type Provider = {
   fullName: string;
   specialty: string;
   isActive: boolean;
+  stripeAccountId?: string | null;
 };
 
 export type ProviderAvailability = {
@@ -42,6 +43,7 @@ export type ServiceOffering = {
   durationMinutes: number;
   priceCents?: number | null;
   isActive: boolean;
+  requireOnlinePayment?: boolean;
 };
 
 export type ServiceOfferingWriteInput = {
@@ -50,6 +52,7 @@ export type ServiceOfferingWriteInput = {
   durationMinutes: number;
   priceCents?: number | null;
   isActive?: boolean;
+  requireOnlinePayment?: boolean;
 };
 
 export type PublicBookingPage = {
@@ -84,7 +87,8 @@ export type PublicBookingRequestInput = {
   fullName: string;
   email?: string | null;
   phone: string;
-  password: string;
+  password?: string;
+  customerAccessToken?: string;
   providerId: string;
   offeringId?: string | null;
   startsAt: string;

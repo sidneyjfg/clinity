@@ -4,12 +4,16 @@ import type {
   IntegrationSummary,
   MeResponse,
   Customer,
+  FinancialHistoryItem,
   Provider,
   ProviderAvailability,
   ServiceOffering,
   UserProfile,
   UserRole,
-  MercadoPagoConnectUrl,
+  StripeAccountStatusResponse,
+  StripeBalance,
+  StripeConnectAccount,
+  StripeOnboardingLink,
   OrganizationPaymentSettings,
   ProviderPaymentSettings,
   WhatsAppConnectionStatus,
@@ -27,11 +31,23 @@ export const apiRoutes = {
     account: "/v1/auth/account",
     password: "/v1/auth/password"
   },
+  systemAdmin: {
+    signIn: "/v1/system-admin/auth/sign-in",
+    tenants: "/v1/system-admin/tenants",
+    audit: "/v1/system-admin/audit/events",
+    summary: "/v1/system-admin/summary",
+    marketplaceAudit: "/v1/system-admin/marketplace-audit"
+  },
   organizations: {
     update: (id: string) => `/v1/organizations/${id}`,
     storefront: "/v1/organizations/storefront",
     paymentSettings: "/v1/organization/payment-settings",
-    mercadoPagoConnect: "/v1/organization/mercado-pago/connect"
+    stripeAccount: "/v1/organization/stripe/accounts",
+    stripeOnboarding: "/v1/organization/stripe/onboarding-links",
+    stripeBalance: "/v1/organization/stripe/balance",
+    stripeStatus: "/v1/organization/stripe/account-status",
+    stripeTransactions: "/v1/organization/stripe/transactions",
+    stripePayouts: "/v1/organization/stripe/payouts"
   },
   providers: {
     list: "/v1/providers",
@@ -40,7 +56,12 @@ export const apiRoutes = {
     status: (id: string) => `/v1/providers/${id}/status`,
     availability: (id: string) => `/v1/providers/${id}/availability`,
     paymentSettings: (id: string) => `/v1/providers/${id}/payment-settings`,
-    mercadoPagoConnect: (id: string) => `/v1/providers/${id}/mercado-pago/connect`
+    stripeAccount: (id: string) => `/v1/providers/${id}/stripe/accounts`,
+    stripeOnboarding: (id: string) => `/v1/providers/${id}/stripe/onboarding-links`,
+    stripeBalance: (id: string) => `/v1/providers/${id}/stripe/balance`,
+    stripeStatus: (id: string) => `/v1/providers/${id}/stripe/account-status`,
+    stripeTransactions: (id: string) => `/v1/providers/${id}/stripe/transactions`,
+    stripePayouts: (id: string) => `/v1/providers/${id}/stripe/payouts`
   },
   serviceOfferings: {
     list: "/v1/service-offerings",
@@ -86,6 +107,11 @@ export const apiRoutes = {
     detail: (slug: string) => `/v1/public/organizations/${slug}`,
     availability: (slug: string) => `/v1/public/organizations/${slug}/availability`,
     bookings: (slug: string) => `/v1/public/organizations/${slug}/bookings`
+  },
+  publicCustomers: {
+    signUp: "/v1/public/customers/sign-up",
+    signIn: "/v1/public/customers/sign-in",
+    me: "/v1/public/customers/me"
   }
 } as const;
 
@@ -123,7 +149,11 @@ export type ProviderPaymentSettingsUpdateDTO = {
   absorbsProcessingFee?: boolean;
 };
 
-export type MercadoPagoConnectUrlDTO = MercadoPagoConnectUrl;
+export type StripeOnboardingLinkDTO = StripeOnboardingLink;
+export type StripeConnectAccountDTO = StripeConnectAccount;
+export type StripeBalanceDTO = StripeBalance;
+export type StripeAccountStatusDTO = StripeAccountStatusResponse;
+export type FinancialHistoryItemDTO = FinancialHistoryItem;
 
 export type ServiceOfferingDTO = ServiceOffering;
 
@@ -132,7 +162,21 @@ export type ServiceOfferingWriteDTO = {
   name: string;
   durationMinutes: number;
   priceCents?: number | null;
+  requireOnlinePayment?: boolean;
   isActive?: boolean;
+};
+
+export type MarketplaceAuditDTO = {
+  organizationId: string;
+  organizationName: string;
+  onlineRevenueCents: number;
+  onlineCommissionCents: number;
+  presentialRevenueCents: number;
+  presentialCommissionCents: number;
+  onlineCount: number;
+  presentialCount: number;
+  pendingStatusCount: number;
+  presentialRatio: number;
 };
 
 export type BookingDTO = Booking;
@@ -162,13 +206,40 @@ export type PublicBookingWriteDTO = {
   fullName: string;
   email?: string | null;
   phone: string;
-  password: string;
+  password?: string;
+  customerAccessToken?: string;
   providerId: string;
   offeringId?: string | null;
   startsAt: string;
   endsAt: string;
   notes?: string | null;
   paymentType?: "online" | "presential";
+};
+
+export type PublicCustomerSessionDTO = {
+  accessToken: string;
+  customer: {
+    id: string;
+    fullName: string;
+    email?: string | null;
+    phone: string;
+  };
+};
+
+export type PublicCustomerPortalDTO = {
+  customer: PublicCustomerSessionDTO["customer"];
+  bookings: Array<Booking & {
+    organizationName: string;
+    organizationSlug: string;
+  }>;
+  places: Array<{
+    organizationId: string;
+    organizationName: string;
+    organizationSlug: string;
+    visits: number;
+    spentCents: number;
+    lastVisitAt: string;
+  }>;
 };
 
 export type SignInInputDTO = {

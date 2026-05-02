@@ -12,6 +12,7 @@ const providerServiceWriteSchema = z.object({
   name: z.string().min(2).max(120),
   durationMinutes: z.number().int().min(5).max(720),
   priceCents: z.number().int().min(0).nullable().optional(),
+  requireOnlinePayment: z.boolean().optional(),
   isActive: z.boolean().optional(),
 });
 
@@ -40,6 +41,7 @@ export class ServiceOfferingsService {
       name: data.name,
       durationMinutes: data.durationMinutes,
       priceCents: data.priceCents ?? null,
+      requireOnlinePayment: data.requireOnlinePayment ?? false,
       ...(data.isActive === undefined ? {} : { isActive: data.isActive }),
     });
   }
@@ -57,6 +59,7 @@ export class ServiceOfferingsService {
       name: data.name,
       durationMinutes: data.durationMinutes,
       priceCents: data.priceCents ?? null,
+      requireOnlinePayment: data.requireOnlinePayment ?? false,
       ...(data.isActive === undefined ? {} : { isActive: data.isActive }),
     });
 

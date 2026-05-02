@@ -32,6 +32,7 @@ export class AuthRepository {
       email: user.email,
       phone: user.phone,
       role: user.role as AuthenticatedUser["role"],
+      providerId: user.providerId,
       passwordHash: user.passwordHash,
       isActive: user.isActive,
     };
@@ -55,6 +56,7 @@ export class AuthRepository {
       email: user.email,
       phone: user.phone,
       role: user.role as AuthenticatedUser["role"],
+      providerId: user.providerId,
       passwordHash: user.passwordHash,
       isActive: user.isActive,
     };
@@ -79,6 +81,7 @@ export class AuthRepository {
       email: user.email,
       phone: user.phone,
       role: user.role as Role,
+      providerId: user.providerId,
       isActive: user.isActive,
       createdAt: user.createdAt.toISOString(),
     };
@@ -104,6 +107,7 @@ export class AuthRepository {
       email: user.email,
       phone: user.phone,
       role: user.role as Role,
+      providerId: user.providerId,
       isActive: user.isActive,
       createdAt: user.createdAt.toISOString(),
     };
@@ -116,6 +120,7 @@ export class AuthRepository {
       email: string;
       phone: string;
       role: Role;
+      providerId?: string | null;
       passwordHash: string;
       isActive: boolean;
     },
@@ -128,6 +133,7 @@ export class AuthRepository {
       email: input.email,
       phone: input.phone,
       role: input.role,
+      providerId: input.providerId ?? null,
       passwordHash: input.passwordHash,
       isActive: input.isActive,
     });
@@ -139,6 +145,7 @@ export class AuthRepository {
       email: user.email,
       phone: user.phone,
       role: user.role as Role,
+      providerId: user.providerId,
       isActive: user.isActive,
       createdAt: user.createdAt.toISOString(),
     };
@@ -175,6 +182,7 @@ export class AuthRepository {
       email: savedUser.email,
       phone: savedUser.phone,
       role: savedUser.role as Role,
+      providerId: savedUser.providerId,
       isActive: savedUser.isActive,
       createdAt: savedUser.createdAt.toISOString(),
     };

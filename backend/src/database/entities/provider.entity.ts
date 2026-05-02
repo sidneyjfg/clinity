@@ -27,6 +27,9 @@ export class ProviderEntity {
   @Column({ type: "boolean", default: true })
   public isActive!: boolean;
 
+  @Column({ name: "stripe_account_id", type: "varchar", length: 120, nullable: true })
+  public stripeAccountId!: string | null;
+
   @CreateDateColumn({ type: "datetime" })
   public createdAt!: Date;
 

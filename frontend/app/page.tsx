@@ -104,7 +104,8 @@ export default function MarketingPage() {
               <ButtonLink href="/login" variant="ghost">
                 Entrar
               </ButtonLink>
-              <ButtonLink href="/clientes" variant="secondary">Aba clientes</ButtonLink>
+              <ButtonLink href="/cliente/login" variant="ghost">Entrar como cliente</ButtonLink>
+              <ButtonLink href="/clientes" variant="secondary">Ver estabelecimentos</ButtonLink>
               <ButtonLink href="/signup">Aba parceiro</ButtonLink>
             </div>
           </header>
@@ -125,6 +126,9 @@ export default function MarketingPage() {
                 <ButtonLink href="/clientes" size="lg">
                   Encontrar estabelecimento
                   <ArrowRight className="ml-2 h-4 w-4" />
+                </ButtonLink>
+                <ButtonLink href="/cliente/criar-conta" size="lg" variant="secondary">
+                  Criar conta de cliente
                 </ButtonLink>
                 <ButtonLink href="/signup" size="lg" variant="secondary">
                   Sou parceiro

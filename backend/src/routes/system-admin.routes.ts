@@ -55,4 +55,12 @@ export const systemAdminRoutes = async (
     },
     controller.getOperationalSummary,
   );
+
+  app.get(
+    "/system-admin/marketplace-audit",
+    {
+      preHandler: systemAdminAuthMiddleware,
+    },
+    controller.getMarketplaceAudit,
+  );
 };

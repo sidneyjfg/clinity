@@ -110,6 +110,33 @@ export class BookingsRepository {
     return booking ? this.mapBooking(booking) : null;
   }
 
+  public async findByCustomerIdentity(input: { email?: string | null; phone: string }): Promise<Array<Booking & {
+    organizationName: string;
+    organizationSlug: string;
+  }>> {
+    const query = this.getRepository().createQueryBuilder("booking")
+      .leftJoinAndSelect("booking.customer", "customer")
+      .leftJoinAndSelect("booking.provider", "provider")
+      .leftJoinAndSelect("booking.offering", "offering")
+      .leftJoinAndSelect("booking.organization", "organization")
+      .where("customer.phone = :phone", { phone: input.phone });
+
+    if (input.email) {
+      query.orWhere("customer.email = :email", { email: input.email });
+    }
+
+    const bookings = await query
+      .orderBy("booking.startsAt", "DESC")
+      .take(100)
+      .getMany();
+
+    return bookings.map((booking) => ({
+      ...this.mapBooking(booking),
+      organizationName: booking.organization.tradeName,
+      organizationSlug: booking.organization.bookingPageSlug,
+    }));
+  }
+
   public async create(
     input: {
       organizationId: string;
@@ -131,7 +158,7 @@ export class BookingsRepository {
       paymentStatus?: BookingPaymentStatus;
       paymentCheckoutUrl?: string | null;
     },
-    manager: EntityManager,
+    manager?: EntityManager,
   ): Promise<Booking> {
     const booking = await this.getRepository(manager).save({
       id: randomUUID(),
@@ -191,7 +218,7 @@ export class BookingsRepository {
       paymentStatus?: BookingPaymentStatus;
       paymentCheckoutUrl?: string | null;
     },
-    manager: EntityManager,
+    manager?: EntityManager,
   ): Promise<Booking | null> {
     const repository = this.getRepository(manager);
     const booking = await repository.findOne({

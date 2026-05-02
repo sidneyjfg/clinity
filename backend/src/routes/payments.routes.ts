@@ -6,21 +6,24 @@ import { AuditRepository } from "../repositories/audit.repository";
 import { BookingNotificationsRepository } from "../repositories/booking-notifications.repository";
 import { BookingsRepository } from "../repositories/bookings.repository";
 import { CustomersRepository } from "../repositories/customers.repository";
+import { FinancialLedgerRepository } from "../repositories/financial-ledger.repository";
 import { OrganizationIntegrationsRepository } from "../repositories/organization-integrations.repository";
 import { OrganizationNotificationSettingsRepository } from "../repositories/organization-notification-settings.repository";
 import { OrganizationsRepository } from "../repositories/organizations.repository";
 import { OrganizationPaymentSettingsRepository } from "../repositories/organization-payment-settings.repository";
 import { PaymentTransactionsRepository } from "../repositories/payment-transactions.repository";
+import { ProviderPayoutsRepository } from "../repositories/provider-payouts.repository";
 import { ProviderPaymentSettingsRepository } from "../repositories/provider-payment-settings.repository";
 import { ProvidersRepository } from "../repositories/providers.repository";
 import { ServiceOfferingsRepository } from "../repositories/service-offerings.repository";
+import { StripeWebhookEventsRepository } from "../repositories/stripe-webhook-events.repository";
 import { allowRoles } from "../middlewares/rbac";
 import { criticalRouteRateLimitMiddleware } from "../middlewares/request-protection";
 import { EvolutionWhatsAppService } from "../services/evolution-whatsapp.service";
-import { MercadoPagoService } from "../services/mercado-pago.service";
 import { NotificationsService } from "../services/notifications.service";
 import { PaymentCalculatorService } from "../services/payment-calculator.service";
 import { PaymentsService } from "../services/payments.service";
+import { StripeService } from "../services/stripe.service";
 
 type PaymentsRouteOptions = {
   dataSource: DataSource;
@@ -52,7 +55,10 @@ export const buildPaymentsService = (dataSource: DataSource): PaymentsService =>
     auditRepository,
     notificationsService,
     new PaymentCalculatorService(),
-    new MercadoPagoService(),
+    new StripeService(),
+    new StripeWebhookEventsRepository(dataSource),
+    new FinancialLedgerRepository(dataSource),
+    new ProviderPayoutsRepository(dataSource),
   );
 };
 
@@ -79,11 +85,59 @@ export const paymentsRoutes = async (
   );
 
   app.post(
-    "/organization/mercado-pago/connect",
+    "/organization/stripe/accounts",
     {
       preHandler: [allowRoles(["administrator"]), criticalRouteRateLimitMiddleware("payments:connect")],
     },
-    controller.createOrganizationMercadoPagoConnectUrl,
+    controller.createOrganizationStripeExpressAccount,
+  );
+
+  app.post(
+    "/organization/stripe/onboarding-links",
+    {
+      preHandler: [allowRoles(["administrator"]), criticalRouteRateLimitMiddleware("payments:onboarding")],
+    },
+    controller.createOrganizationStripeOnboardingLink,
+  );
+
+  app.get(
+    "/organization/stripe/balance",
+    {
+      preHandler: [allowRoles(["administrator"]), criticalRouteRateLimitMiddleware("payments:balance")],
+    },
+    controller.getOrganizationStripeBalance,
+  );
+
+  app.post(
+    "/organization/stripe/payouts",
+    {
+      preHandler: [allowRoles(["administrator"]), criticalRouteRateLimitMiddleware("payments:payout")],
+    },
+    controller.requestOrganizationStripePayout,
+  );
+
+  app.get(
+    "/organization/stripe/account-status",
+    {
+      preHandler: [allowRoles(["administrator"]), criticalRouteRateLimitMiddleware("payments:account-status")],
+    },
+    controller.getOrganizationStripeAccountStatus,
+  );
+
+  app.get(
+    "/organization/stripe/transactions",
+    {
+      preHandler: [allowRoles(["administrator"]), criticalRouteRateLimitMiddleware("payments:transactions")],
+    },
+    controller.getOrganizationTransactionHistory,
+  );
+
+  app.get(
+    "/organization/stripe/payouts",
+    {
+      preHandler: [allowRoles(["administrator"]), criticalRouteRateLimitMiddleware("payments:payout-history")],
+    },
+    controller.getOrganizationPayoutHistory,
   );
 
   app.get(
@@ -103,13 +157,60 @@ export const paymentsRoutes = async (
   );
 
   app.post(
-    "/providers/:providerId/mercado-pago/connect",
+    "/providers/:providerId/stripe/accounts",
     {
       preHandler: [allowRoles(["administrator"]), criticalRouteRateLimitMiddleware("payments:connect")],
     },
-    controller.createMercadoPagoConnectUrl,
+    controller.createStripeExpressAccount,
   );
 
-  app.get("/public/payments/mercado-pago/oauth/callback", controller.handleMercadoPagoOAuthCallback);
-  app.post("/public/payments/mercado-pago/webhooks", controller.handleMercadoPagoWebhook);
+  app.post(
+    "/providers/:providerId/stripe/onboarding-links",
+    {
+      preHandler: [allowRoles(["administrator", "provider"]), criticalRouteRateLimitMiddleware("payments:onboarding")],
+    },
+    controller.createStripeOnboardingLink,
+  );
+
+  app.get(
+    "/providers/:providerId/stripe/balance",
+    {
+      preHandler: [allowRoles(["administrator", "provider"]), criticalRouteRateLimitMiddleware("payments:balance")],
+    },
+    controller.getStripeBalance,
+  );
+
+  app.post(
+    "/providers/:providerId/stripe/payouts",
+    {
+      preHandler: [allowRoles(["administrator", "provider"]), criticalRouteRateLimitMiddleware("payments:payout")],
+    },
+    controller.requestStripePayout,
+  );
+
+  app.get(
+    "/providers/:providerId/stripe/account-status",
+    {
+      preHandler: [allowRoles(["administrator", "provider"]), criticalRouteRateLimitMiddleware("payments:account-status")],
+    },
+    controller.getStripeAccountStatus,
+  );
+
+  app.get(
+    "/providers/:providerId/stripe/transactions",
+    {
+      preHandler: [allowRoles(["administrator", "provider"]), criticalRouteRateLimitMiddleware("payments:transactions")],
+    },
+    controller.getTransactionHistory,
+  );
+
+  app.get(
+    "/providers/:providerId/stripe/payouts",
+    {
+      preHandler: [allowRoles(["administrator", "provider"]), criticalRouteRateLimitMiddleware("payments:payout-history")],
+    },
+    controller.getPayoutHistory,
+  );
+
+  app.post("/public/payments/stripe/webhooks", controller.handleStripeWebhook);
 };

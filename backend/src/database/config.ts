@@ -12,6 +12,9 @@ import { AddMarketplacePayments1713567000000 } from "./migrations/1713567000000-
 import { AddOrganizationStorefront1713568000000 } from "./migrations/1713568000000-add-organization-storefront";
 import { AddCustomerPasswordHash1713569000000 } from "./migrations/1713569000000-add-customer-password-hash";
 import { AddOrganizationPaymentSettings1713570000000 } from "./migrations/1713570000000-add-organization-payment-settings";
+import {AddServiceOfferingOnlineRequirement1713571000000} from "./migrations/1713571000000-add-service-offering-online-requirement";
+import { ReplaceMercadoPagoWithStripeConnect1713572000000 } from "./migrations/1713572000000-replace-mercado-pago-with-stripe-connect";
+import { MoveStripeConnectToOrganization1713573000000 } from "./migrations/1713573000000-move-stripe-connect-to-organization";
 import { databaseEntities } from "./entities";
 
 export type DatabaseDriver = "mysql" | "sqljs";
@@ -47,6 +50,9 @@ export const buildDatabaseOptions = (overrides: DatabaseConfigOverrides = {}): D
         AddOrganizationStorefront1713568000000,
         AddCustomerPasswordHash1713569000000,
         AddOrganizationPaymentSettings1713570000000,
+        AddServiceOfferingOnlineRequirement1713571000000,
+        ReplaceMercadoPagoWithStripeConnect1713572000000,
+        MoveStripeConnectToOrganization1713573000000,
       ],
     };
   }
@@ -74,6 +80,9 @@ export const buildDatabaseOptions = (overrides: DatabaseConfigOverrides = {}): D
       AddOrganizationStorefront1713568000000,
       AddCustomerPasswordHash1713569000000,
       AddOrganizationPaymentSettings1713570000000,
+      AddServiceOfferingOnlineRequirement1713571000000,
+      ReplaceMercadoPagoWithStripeConnect1713572000000,
+      MoveStripeConnectToOrganization1713573000000,
     ],
   };
 };

@@ -4,6 +4,7 @@ import { AuditEventEntity } from "./audit-event.entity";
 import { OrganizationEntity } from "./organization.entity";
 import { BookingEntity } from "./booking.entity";
 import { AuthSessionEntity } from "./auth-session.entity";
+import { ProviderEntity } from "./provider.entity";
 
 @Entity({ name: "users" })
 @Unique("uq_users_organization_email", ["organizationId", "email"])
@@ -35,6 +36,13 @@ export class UserEntity {
 
   @Column({ type: "boolean", default: true })
   public isActive!: boolean;
+
+  @Column({ type: "varchar", length: 36, nullable: true })
+  public providerId!: string | null;
+
+  @ManyToOne(() => ProviderEntity, { onDelete: "SET NULL", nullable: true })
+  @JoinColumn({ name: "providerId" })
+  public provider!: ProviderEntity | null;
 
   @CreateDateColumn({ type: "datetime" })
   public createdAt!: Date;

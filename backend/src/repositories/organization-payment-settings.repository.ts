@@ -16,11 +16,15 @@ export class OrganizationPaymentSettingsRepository {
       commissionRateBps: settings.commissionRateBps,
       onlineDiscountBps: settings.onlineDiscountBps,
       absorbsProcessingFee: settings.absorbsProcessingFee,
-      mercadoPagoConnected: settings.mercadoPagoConnected,
-      mercadoPagoUserId: settings.mercadoPagoUserId,
-      mercadoPagoAccessToken: settings.mercadoPagoAccessToken,
-      mercadoPagoRefreshToken: settings.mercadoPagoRefreshToken,
-      mercadoPagoTokenExpiresAt: settings.mercadoPagoTokenExpiresAt?.toISOString() ?? null,
+      stripeAccountId: settings.stripeAccountId,
+      stripeChargesEnabled: settings.stripeChargesEnabled,
+      stripePayoutsEnabled: settings.stripePayoutsEnabled,
+      stripeDetailsSubmitted: settings.stripeDetailsSubmitted,
+      stripeCurrentlyDue: settings.stripeCurrentlyDue ?? [],
+      stripeEventuallyDue: settings.stripeEventuallyDue ?? [],
+      stripePastDue: settings.stripePastDue ?? [],
+      stripeDisabledReason: settings.stripeDisabledReason,
+      stripeAccountStatus: settings.stripeAccountStatus as OrganizationPaymentSettings["stripeAccountStatus"],
     };
   }
 
@@ -53,7 +57,15 @@ export class OrganizationPaymentSettingsRepository {
       commissionRateBps: 1000,
       onlineDiscountBps: 500,
       absorbsProcessingFee: true,
-      mercadoPagoConnected: false,
+      stripeAccountId: null,
+      stripeChargesEnabled: false,
+      stripePayoutsEnabled: false,
+      stripeDetailsSubmitted: false,
+      stripeCurrentlyDue: [],
+      stripeEventuallyDue: [],
+      stripePastDue: [],
+      stripeDisabledReason: null,
+      stripeAccountStatus: "pending",
     });
 
     return this.mapSettings(settings);
@@ -66,28 +78,63 @@ export class OrganizationPaymentSettingsRepository {
   ): Promise<OrganizationPaymentSettings> {
     const repository = this.getRepository(manager);
     const current = await this.getOrCreateDefault(organizationId, manager);
+    
     const settings = repository.create({
       organizationId,
       commissionRateBps: input.commissionRateBps ?? current.commissionRateBps,
       onlineDiscountBps: input.onlineDiscountBps ?? current.onlineDiscountBps,
       absorbsProcessingFee: input.absorbsProcessingFee ?? current.absorbsProcessingFee,
-      mercadoPagoConnected: current.mercadoPagoConnected,
-      mercadoPagoUserId: current.mercadoPagoUserId ?? null,
-      mercadoPagoAccessToken: current.mercadoPagoAccessToken ?? null,
-      mercadoPagoRefreshToken: current.mercadoPagoRefreshToken ?? null,
-      mercadoPagoTokenExpiresAt: current.mercadoPagoTokenExpiresAt ? new Date(current.mercadoPagoTokenExpiresAt) : null,
+      stripeAccountId: current.stripeAccountId ?? null,
+      stripeChargesEnabled: current.stripeChargesEnabled,
+      stripePayoutsEnabled: current.stripePayoutsEnabled,
+      stripeDetailsSubmitted: current.stripeDetailsSubmitted,
+      stripeCurrentlyDue: current.stripeCurrentlyDue,
+      stripeEventuallyDue: current.stripeEventuallyDue,
+      stripePastDue: current.stripePastDue,
+      stripeDisabledReason: current.stripeDisabledReason ?? null,
+      stripeAccountStatus: current.stripeAccountStatus,
     });
 
     return this.mapSettings(await repository.save(settings));
   }
 
-  public async saveMercadoPagoConnection(
+  public async saveStripeAccountId(
+    organizationId: string,
+    stripeAccountId: string,
+    manager?: EntityManager,
+  ): Promise<OrganizationPaymentSettings> {
+    const repository = this.getRepository(manager);
+    const current = await this.getOrCreateDefault(organizationId, manager);
+    const settings = repository.create({
+      organizationId,
+      commissionRateBps: current.commissionRateBps,
+      onlineDiscountBps: current.onlineDiscountBps,
+      absorbsProcessingFee: current.absorbsProcessingFee,
+      stripeAccountId,
+      stripeChargesEnabled: current.stripeChargesEnabled,
+      stripePayoutsEnabled: current.stripePayoutsEnabled,
+      stripeDetailsSubmitted: current.stripeDetailsSubmitted,
+      stripeCurrentlyDue: current.stripeCurrentlyDue,
+      stripeEventuallyDue: current.stripeEventuallyDue,
+      stripePastDue: current.stripePastDue,
+      stripeDisabledReason: current.stripeDisabledReason ?? null,
+      stripeAccountStatus: current.stripeAccountStatus,
+    });
+
+    return this.mapSettings(await repository.save(settings));
+  }
+
+  public async updateStripeAccountStatus(
     organizationId: string,
     input: {
-      mercadoPagoUserId: string;
-      mercadoPagoAccessToken: string;
-      mercadoPagoRefreshToken: string;
-      mercadoPagoTokenExpiresAt: Date;
+      chargesEnabled: boolean;
+      payoutsEnabled: boolean;
+      detailsSubmitted: boolean;
+      currentlyDue: string[];
+      eventuallyDue: string[];
+      pastDue: string[];
+      disabledReason?: string | null;
+      accountStatus: OrganizationPaymentSettings["stripeAccountStatus"];
     },
     manager?: EntityManager,
   ): Promise<OrganizationPaymentSettings> {
@@ -98,13 +145,22 @@ export class OrganizationPaymentSettingsRepository {
       commissionRateBps: current.commissionRateBps,
       onlineDiscountBps: current.onlineDiscountBps,
       absorbsProcessingFee: current.absorbsProcessingFee,
-      mercadoPagoConnected: true,
-      mercadoPagoUserId: input.mercadoPagoUserId,
-      mercadoPagoAccessToken: input.mercadoPagoAccessToken,
-      mercadoPagoRefreshToken: input.mercadoPagoRefreshToken,
-      mercadoPagoTokenExpiresAt: input.mercadoPagoTokenExpiresAt,
+      stripeAccountId: current.stripeAccountId ?? null,
+      stripeChargesEnabled: input.chargesEnabled,
+      stripePayoutsEnabled: input.payoutsEnabled,
+      stripeDetailsSubmitted: input.detailsSubmitted,
+      stripeCurrentlyDue: input.currentlyDue,
+      stripeEventuallyDue: input.eventuallyDue,
+      stripePastDue: input.pastDue,
+      stripeDisabledReason: input.disabledReason ?? null,
+      stripeAccountStatus: input.accountStatus,
     });
 
     return this.mapSettings(await repository.save(settings));
+  }
+
+  public async findByStripeAccountId(stripeAccountId: string, manager?: EntityManager): Promise<OrganizationPaymentSettings | null> {
+    const settings = await this.getRepository(manager).findOne({ where: { stripeAccountId } });
+    return settings ? this.mapSettings(settings) : null;
   }
 }

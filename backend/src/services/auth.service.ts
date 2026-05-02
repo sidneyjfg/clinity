@@ -85,6 +85,7 @@ export class AuthService {
       sub: user.id,
       organizationId: user.organizationId,
       role: user.role,
+      providerId: user.providerId ?? null,
       sessionId,
     });
 
@@ -100,6 +101,7 @@ export class AuthService {
         sub: user.id,
         organizationId: user.organizationId,
         role: user.role,
+        providerId: user.providerId ?? null,
         sessionId,
       }),
       refreshToken,
@@ -135,6 +137,7 @@ export class AuthService {
       sub: user.id,
       organizationId: user.organizationId,
       role: user.role,
+      providerId: user.providerId ?? null,
       sessionId: newSessionId,
     });
 
@@ -150,6 +153,7 @@ export class AuthService {
         sub: user.id,
         organizationId: user.organizationId,
         role: user.role,
+        providerId: user.providerId ?? null,
         sessionId: newSessionId,
       }),
       refreshToken,
@@ -299,12 +303,14 @@ export class AuthService {
     organizationId: string;
     userId: string;
     role: AuthSession["role"];
+    providerId?: string | null;
   }): Promise<AuthSession> {
     const sessionId = randomUUID();
     const refreshToken = createRefreshToken({
       sub: input.userId,
       organizationId: input.organizationId,
       role: input.role,
+      providerId: input.providerId ?? null,
       sessionId,
     });
 
@@ -320,6 +326,7 @@ export class AuthService {
         sub: input.userId,
         organizationId: input.organizationId,
         role: input.role,
+        providerId: input.providerId ?? null,
         sessionId,
       }),
       refreshToken,

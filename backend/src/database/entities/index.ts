@@ -11,6 +11,9 @@ import { ProviderAvailabilityEntity } from "./provider-availability.entity";
 import { ProviderPaymentSettingsEntity } from "./provider-payment-settings.entity";
 import { ProviderEntity } from "./provider.entity";
 import { PaymentTransactionEntity } from "./payment-transaction.entity";
+import { FinancialLedgerEntity } from "./financial-ledger.entity";
+import { ProviderPayoutEntity } from "./provider-payout.entity";
+import { StripeWebhookEventEntity } from "./stripe-webhook-event.entity";
 import { ServiceOfferingEntity } from "./service-offering.entity";
 import { UserEntity } from "./user.entity";
 
@@ -24,6 +27,9 @@ export const databaseEntities = [
   CustomerEntity,
   BookingEntity,
   PaymentTransactionEntity,
+  ProviderPayoutEntity,
+  FinancialLedgerEntity,
+  StripeWebhookEventEntity,
   BookingNotificationEntity,
   AuditEventEntity,
   AuthSessionEntity,
@@ -46,6 +52,9 @@ export {
   ProviderPaymentSettingsEntity,
   ProviderEntity,
   PaymentTransactionEntity,
+  ProviderPayoutEntity,
+  FinancialLedgerEntity,
+  StripeWebhookEventEntity,
   ServiceOfferingEntity,
   UserEntity,
 };

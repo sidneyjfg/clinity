@@ -3,11 +3,11 @@ import { describe, expect, it } from "vitest";
 import { PaymentCalculatorService } from "../../../src/services/payment-calculator.service";
 
 describe("PaymentCalculatorService", () => {
-  it("applies online discount and dynamic marketplace commission", () => {
+  it("applies online discount and fixed Stripe Connect 10% platform fee", () => {
     const service = new PaymentCalculatorService();
 
     const result = service.calculate("online", 20000, {
-      commissionRateBps: 500,
+      commissionRateBps: 5000,
       onlineDiscountBps: 500,
     });
 
@@ -16,14 +16,14 @@ describe("PaymentCalculatorService", () => {
       originalAmountCents: 20000,
       discountedAmountCents: 19000,
       onlineDiscountCents: 1000,
-      platformCommissionRateBps: 500,
-      platformCommissionCents: 950,
-      providerNetAmountCents: 18050,
+      platformCommissionRateBps: 1000,
+      platformCommissionCents: 1900,
+      providerNetAmountCents: 17100,
       paymentStatus: "pending",
     });
   });
 
-  it("does not apply discount for presential payment and keeps internal commission control", () => {
+  it("does not apply discount for presential payment and keeps the fixed 10% fee", () => {
     const service = new PaymentCalculatorService();
 
     const result = service.calculate("presential", 20000, {

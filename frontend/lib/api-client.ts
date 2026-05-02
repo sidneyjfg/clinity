@@ -137,6 +137,30 @@ function notifySessionExpired(): void {
   });
 }
 
+function translateApiErrorMessage(code: string | undefined, message: string): string {
+  const paymentMessages: Record<string, string> = {
+    "payments.stripe_not_configured": "O provedor de pagamentos não está configurado.",
+    "payments.stripe_connect_not_enabled": "A plataforma ainda não habilitou o processamento de pagamentos para contas conectadas.",
+    "payments.stripe_payouts_not_enabled": "A conta de pagamentos ainda não está pronta para saques.",
+    "payments.insufficient_balance": "Saldo disponível insuficiente para solicitar saque.",
+    "payments.stripe_account_required": "A organização precisa concluir a verificação de identidade antes.",
+    "payments.provider_not_eligible": "A conta de pagamentos ainda não está apta para receber pagamentos online.",
+    "payments.payout_account_not_verified": "A conta de pagamentos precisa estar verificada antes de solicitar saques."
+  };
+
+  if (code && paymentMessages[code]) {
+    return paymentMessages[code];
+  }
+
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes("stripe") || normalized.includes("connect")) {
+    return "Não foi possível concluir a operação com o provedor de pagamentos. Tente novamente ou fale com o suporte.";
+  }
+
+  return message;
+}
+
 async function refreshSession(currentSession: AuthSession): Promise<AuthSession> {
   const response = await fetch(buildUrl(apiRoutes.auth.refresh), {
     method: "POST",
@@ -238,7 +262,8 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     const details = (error?.details ?? [])
       .map((detail) => (detail.field ? `${detail.field}: ${detail.message}` : detail.message))
       .filter(Boolean);
-    const message = [error?.message ?? "Falha ao se comunicar com o backend.", ...details].join(" ");
+    const rawMessage = [error?.message ?? "Falha ao se comunicar com o backend.", ...details].join(" ");
+    const message = translateApiErrorMessage(error?.code, rawMessage);
 
     throw new ApiRequestError(message, response.status, error?.code, details);
   }

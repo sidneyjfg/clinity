@@ -8,11 +8,15 @@ export type ProviderPaymentSettings = {
   commissionRateBps: number;
   onlineDiscountBps: number;
   absorbsProcessingFee: boolean;
-  mercadoPagoConnected: boolean;
-  mercadoPagoUserId?: string | null;
-  mercadoPagoAccessToken?: string | null;
-  mercadoPagoRefreshToken?: string | null;
-  mercadoPagoTokenExpiresAt?: string | null;
+  stripeAccountId?: string | null;
+  stripeChargesEnabled: boolean;
+  stripePayoutsEnabled: boolean;
+  stripeDetailsSubmitted: boolean;
+  stripeCurrentlyDue: string[];
+  stripeEventuallyDue: string[];
+  stripePastDue: string[];
+  stripeDisabledReason?: string | null;
+  stripeAccountStatus: StripeAccountStatus;
 };
 
 export type OrganizationPaymentSettings = Omit<ProviderPaymentSettings, "providerId">;
@@ -28,16 +32,61 @@ export type PaymentBreakdown = {
   paymentStatus: PaymentStatus;
 };
 
-export type MercadoPagoOAuthConnectUrl = {
-  providerId: string;
-  authorizationUrl: string;
+export type StripeConnectAccount = {
+  providerId?: string;
+  organizationId?: string;
+  stripeAccountId: string;
+  chargesEnabled: boolean;
+  payoutsEnabled: boolean;
+  detailsSubmitted: boolean;
 };
 
-export type MercadoPagoWebhookInput = {
-  bookingId?: string;
-  eventType?: string;
-  paymentId?: string;
-  payload: unknown;
-  signature?: string;
-  requestId?: string;
+export type StripeOnboardingLink = {
+  providerId?: string;
+  organizationId?: string;
+  onboardingUrl: string;
+};
+
+export type StripeBalance = {
+  providerId?: string;
+  organizationId?: string;
+  available: Array<{ amount: number; currency: string }>;
+  pending: Array<{ amount: number; currency: string }>;
+};
+
+export type StripePayoutResult = {
+  providerId?: string;
+  organizationId?: string;
+  payoutId: string;
+  amount: number;
+  currency: string;
+  status: string;
+};
+
+export type StripeAccountStatus = "pending" | "verified" | "restricted";
+
+export type StripeAccountStatusResponse = {
+  providerId?: string;
+  organizationId?: string;
+  status: StripeAccountStatus;
+  chargesEnabled: boolean;
+  payoutsEnabled: boolean;
+  detailsSubmitted: boolean;
+  currentlyDue: string[];
+  eventuallyDue: string[];
+  pastDue: string[];
+  disabledReason?: string | null;
+  canReceivePayments: boolean;
+  canRequestPayouts: boolean;
+  blockedReasons: string[];
+};
+
+export type FinancialHistoryItem = {
+  amountCents: number;
+  currency: string;
+  type: string;
+  status: string;
+  createdAt: string;
+  failureReason?: string | null;
+  metadata?: unknown | null;
 };

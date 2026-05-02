@@ -19,6 +19,7 @@ export class ProvidersRepository {
       fullName: provider.fullName,
       specialty: provider.specialty,
       isActive: provider.isActive,
+      stripeAccountId: provider.stripeAccountId,
     };
   }
 
@@ -77,6 +78,7 @@ export class ProvidersRepository {
       fullName: input.fullName,
       specialty: input.specialty,
       isActive: input.isActive ?? true,
+      stripeAccountId: null,
     });
 
     return this.mapProvider(provider);
@@ -106,6 +108,38 @@ export class ProvidersRepository {
     const savedProvider = await repository.save(provider);
 
     return this.mapProvider(savedProvider);
+  }
+
+  public async findByStripeAccountId(stripeAccountId: string, manager?: EntityManager): Promise<Provider | null> {
+    const provider = await this.getRepository(manager).findOne({
+      where: {
+        stripeAccountId,
+      },
+    });
+
+    return provider ? this.mapProvider(provider) : null;
+  }
+
+  public async saveStripeAccountId(
+    organizationId: string,
+    id: string,
+    stripeAccountId: string,
+    manager?: EntityManager,
+  ): Promise<Provider | null> {
+    const repository = this.getRepository(manager);
+    const provider = await repository.findOne({
+      where: {
+        id,
+        organizationId,
+      },
+    });
+
+    if (!provider) {
+      return null;
+    }
+
+    provider.stripeAccountId = stripeAccountId;
+    return this.mapProvider(await repository.save(provider));
   }
 
   public async setActiveInOrganization(organizationId: string, id: string, isActive: boolean): Promise<Provider | null> {

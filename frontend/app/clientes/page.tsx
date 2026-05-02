@@ -57,8 +57,11 @@ export default function CustomerMarketplacePage() {
               <ButtonLink href="/signup" variant="secondary">
                 Aba parceiro
               </ButtonLink>
-              <ButtonLink href="/clientes">
-                Aba clientes
+              <ButtonLink href="/cliente/login" variant="secondary">
+                Conectar conta
+              </ButtonLink>
+              <ButtonLink href="/cliente/criar-conta">
+                Criar conta
               </ButtonLink>
             </div>
           </header>
@@ -74,6 +77,10 @@ export default function CustomerMarketplacePage() {
           <p className="mt-5 max-w-2xl text-base leading-7 text-slate-300">
             Escolha a clínica, profissional, serviço e horário. O cadastro acontece no final do agendamento com nome, e-mail, telefone e senha para próximos acessos e comunicações da clínica.
           </p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <ButtonLink href="/cliente/criar-conta">Criar conta de cliente</ButtonLink>
+            <ButtonLink href="/cliente/login" variant="secondary">Já tenho conta</ButtonLink>
+          </div>
           <div className="mt-8 grid gap-3 sm:grid-cols-3">
             <div className="rounded-lg border border-white/10 bg-white/5 p-4">
               <Search className="h-5 w-5 text-sky-300" />

@@ -38,12 +38,12 @@ type Env = {
   REDIS_KEY_PREFIX: string;
   REDIS_CONNECT_TIMEOUT_MS: number;
   PUBLIC_API_BASE_URL: string;
-  MERCADO_PAGO_ENABLED: boolean;
-  MERCADO_PAGO_CLIENT_ID: string;
-  MERCADO_PAGO_CLIENT_SECRET: string;
-  MERCADO_PAGO_REDIRECT_URI: string;
-  MERCADO_PAGO_WEBHOOK_SECRET: string;
-  MERCADO_PAGO_TIMEOUT_MS: number;
+  PUBLIC_WEB_APP_URL: string;
+  STRIPE_SECRET_KEY: string;
+  STRIPE_WEBHOOK_SECRET: string;
+  STRIPE_PUBLISHABLE_KEY: string;
+  STRIPE_CONNECT_RETURN_URL: string;
+  STRIPE_CONNECT_REFRESH_URL: string;
 };
 
 const parsePort = (value: string | undefined): number => {
@@ -117,10 +117,10 @@ export const env: Env = {
   REDIS_KEY_PREFIX: process.env.REDIS_KEY_PREFIX ?? "hubly",
   REDIS_CONNECT_TIMEOUT_MS: parsePort(process.env.REDIS_CONNECT_TIMEOUT_MS ?? "10000"),
   PUBLIC_API_BASE_URL: process.env.PUBLIC_API_BASE_URL ?? "http://localhost:3333",
-  MERCADO_PAGO_ENABLED: parseBoolean(process.env.MERCADO_PAGO_ENABLED, false),
-  MERCADO_PAGO_CLIENT_ID: process.env.MERCADO_PAGO_CLIENT_ID ?? "",
-  MERCADO_PAGO_CLIENT_SECRET: process.env.MERCADO_PAGO_CLIENT_SECRET ?? "",
-  MERCADO_PAGO_REDIRECT_URI: process.env.MERCADO_PAGO_REDIRECT_URI ?? "",
-  MERCADO_PAGO_WEBHOOK_SECRET: process.env.MERCADO_PAGO_WEBHOOK_SECRET ?? "",
-  MERCADO_PAGO_TIMEOUT_MS: parsePort(process.env.MERCADO_PAGO_TIMEOUT_MS ?? "10000"),
+  PUBLIC_WEB_APP_URL: process.env.PUBLIC_WEB_APP_URL ?? "http://localhost:3000",
+  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY ?? "",
+  STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET ?? "",
+  STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY ?? "",
+  STRIPE_CONNECT_RETURN_URL: process.env.STRIPE_CONNECT_RETURN_URL ?? `${process.env.PUBLIC_WEB_APP_URL ?? "http://localhost:3000"}/settings?payments=return`,
+  STRIPE_CONNECT_REFRESH_URL: process.env.STRIPE_CONNECT_REFRESH_URL ?? `${process.env.PUBLIC_WEB_APP_URL ?? "http://localhost:3000"}/settings?payments=refresh`,
 };

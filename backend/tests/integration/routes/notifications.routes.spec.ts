@@ -60,8 +60,9 @@ describe("Notifications routes", () => {
     expect(updateResponse.statusCode).toBe(200);
     expect(updateResponse.json().reminders).toEqual([{ hoursBefore: 24 }, { hoursBefore: 5 }]);
 
-    const startsAt = new Date("2026-04-28T14:00:00.000Z");
-    const endsAt = new Date("2026-04-28T14:30:00.000Z");
+    // Usando 2029 para garantir que os lembretes de 24h e 5h estejam no futuro
+    const startsAt = new Date("2029-04-30T14:00:00.000Z");
+    const endsAt = new Date("2029-04-30T14:30:00.000Z");
     const createResponse = await app.inject({
       method: "POST",
       url: "/v1/bookings",
@@ -119,17 +120,21 @@ describe("Notifications routes", () => {
     process.env.WHATSAPP_EVOLUTION_API_KEY = "secret";
     global.fetch = vi.fn()
       .mockResolvedValueOnce({
-        ok: true,
+        ok: true, // 1. getStatus (check existing in ensureWhatsAppIntegration)
         text: async () =>
           JSON.stringify({
             instance: {
               instanceName: "organization-cln_main_001",
-              status: "created",
+              state: "close",
             },
           }),
       })
       .mockResolvedValueOnce({
-        ok: true,
+        ok: true, // 2. setPairingCodeMode (in ensureWhatsAppIntegration)
+        text: async () => JSON.stringify({}),
+      })
+      .mockResolvedValueOnce({
+        ok: true, // 3. getStatus (called by getWhatsAppStatus route handler)
         text: async () =>
           JSON.stringify({
             instance: {
@@ -139,7 +144,7 @@ describe("Notifications routes", () => {
           }),
       })
       .mockResolvedValueOnce({
-        ok: true,
+        ok: true, // 4. sendText (called by processDueWhatsAppReminders)
         text: async () =>
           JSON.stringify({
             key: "msg_123",
@@ -165,8 +170,8 @@ describe("Notifications routes", () => {
       },
     });
 
-    const startsAt = new Date("2026-04-28T15:00:00.000Z");
-    const endsAt = new Date("2026-04-28T15:30:00.000Z");
+    const startsAt = new Date("2029-04-30T15:00:00.000Z");
+    const endsAt = new Date("2029-04-30T15:30:00.000Z");
     const createResponse = await app.inject({
       method: "POST",
       url: "/v1/bookings",

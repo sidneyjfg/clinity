@@ -87,4 +87,40 @@ export class SystemAdminService {
       auditEvents,
     };
   }
+
+  public async getMarketplaceAudit() {
+    const bookingsRepo = this.dataSource.getRepository(BookingEntity);
+    
+    // Total de receita e comissões por tipo de pagamento
+    const stats = await bookingsRepo
+      .createQueryBuilder("booking")
+      .select("booking.organizationId", "organizationId")
+      .addSelect("org.tradeName", "organizationName")
+      .addSelect("SUM(CASE WHEN booking.paymentType = 'online' AND booking.paymentStatus = 'approved' THEN booking.discountedAmountCents ELSE 0 END)", "onlineRevenueCents")
+      .addSelect("SUM(CASE WHEN booking.paymentType = 'online' AND booking.paymentStatus = 'approved' THEN booking.platformCommissionCents ELSE 0 END)", "onlineCommissionCents")
+      .addSelect("SUM(CASE WHEN booking.paymentType = 'presential' AND booking.status = 'attended' THEN booking.discountedAmountCents ELSE 0 END)", "presentialRevenueCents")
+      .addSelect("SUM(CASE WHEN booking.paymentType = 'presential' AND booking.status = 'attended' THEN booking.platformCommissionCents ELSE 0 END)", "presentialCommissionCents")
+      .addSelect("COUNT(CASE WHEN booking.paymentType = 'online' THEN 1 END)", "onlineCount")
+      .addSelect("COUNT(CASE WHEN booking.paymentType = 'presential' THEN 1 END)", "presentialCount")
+      .addSelect("COUNT(CASE WHEN booking.status = 'scheduled' AND booking.startsAt < CURRENT_TIMESTAMP THEN 1 END)", "pendingStatusCount")
+      .innerJoin("booking.organization", "org")
+      .groupBy("booking.organizationId")
+      .addGroupBy("org.tradeName")
+      .getRawMany();
+
+    return stats.map(row => ({
+      organizationId: row.organizationId,
+      organizationName: row.organizationName,
+      onlineRevenueCents: Number(row.onlineRevenueCents),
+      onlineCommissionCents: Number(row.onlineCommissionCents),
+      presentialRevenueCents: Number(row.presentialRevenueCents),
+      presentialCommissionCents: Number(row.presentialCommissionCents),
+      onlineCount: Number(row.onlineCount),
+      presentialCount: Number(row.presentialCount),
+      pendingStatusCount: Number(row.pendingStatusCount),
+      presentialRatio: row.onlineCount + row.presentialCount > 0 
+        ? (Number(row.presentialCount) / (Number(row.onlineCount) + Number(row.presentialCount))) 
+        : 0,
+    }));
+  }
 }

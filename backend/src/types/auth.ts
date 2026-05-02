@@ -18,6 +18,7 @@ export type AuthenticatedUser = {
   email: string;
   phone: string;
   role: Role;
+  providerId?: string | null;
   passwordHash: string;
   isActive: boolean;
 };
@@ -26,6 +27,7 @@ export type AuthenticatedRequestUser = {
   id: string;
   organizationId: string;
   role: Role;
+  providerId?: string | null;
   sessionId: string;
 };
 

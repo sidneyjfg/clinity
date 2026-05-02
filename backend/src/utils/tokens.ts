@@ -8,6 +8,7 @@ type BaseClaims = {
   sub: string;
   organizationId: string;
   role: AccessTokenClaims["role"];
+  providerId?: string | null;
   sessionId: string;
 };
 
@@ -25,6 +26,7 @@ export const createAccessToken = (claims: BaseClaims): string => {
     {
       organizationId: claims.organizationId,
       role: claims.role,
+      providerId: claims.providerId ?? null,
       tokenType: "access",
       sessionId: claims.sessionId,
     },
@@ -38,6 +40,7 @@ export const createRefreshToken = (claims: BaseClaims): string => {
     {
       organizationId: claims.organizationId,
       role: claims.role,
+      providerId: claims.providerId ?? null,
       tokenType: "refresh",
       sessionId: claims.sessionId,
     },
@@ -55,6 +58,7 @@ export const verifyAccessToken = (token: string): AccessTokenClaims => {
     sub: String(payload.sub),
     organizationId: String(payload.organizationId),
     role: payload.role as AccessTokenClaims["role"],
+    providerId: typeof payload.providerId === "string" ? payload.providerId : null,
     tokenType: "access",
     sessionId: String(payload.sessionId),
   };
@@ -69,6 +73,7 @@ export const verifyRefreshToken = (token: string): RefreshTokenClaims => {
     sub: String(payload.sub),
     organizationId: String(payload.organizationId),
     role: payload.role as RefreshTokenClaims["role"],
+    providerId: typeof payload.providerId === "string" ? payload.providerId : null,
     tokenType: "refresh",
     sessionId: String(payload.sessionId),
   };

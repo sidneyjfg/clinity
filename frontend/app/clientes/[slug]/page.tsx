@@ -1,15 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { use, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowLeft, CalendarDays, CheckCircle2, Clock, CreditCard, Lock, MapPin, ShieldCheck, Stethoscope } from "lucide-react";
 
 import { BrandLogo } from "@/components/app/brand-logo";
-import { Button } from "@/components/ui/button";
+import { Button, ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
+import { getCustomerSession } from "@/lib/customer-session";
 import { addDays, formatDateInput, formatTimeLabel } from "@/lib/utils";
 
 type PageProps = {
@@ -29,7 +30,20 @@ export default function CustomerBookingPage({ params }: PageProps) {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
+  const [customerAccessToken, setCustomerAccessToken] = useState("");
   const [paymentType, setPaymentType] = useState<"online" | "presential">("presential");
+
+  useEffect(() => {
+    const session = getCustomerSession();
+    if (!session) {
+      return;
+    }
+
+    setCustomerAccessToken(session.accessToken);
+    setFullName(session.customer.fullName);
+    setEmail(session.customer.email ?? "");
+    setPhone(session.customer.phone);
+  }, []);
 
   const organizationQuery = useQuery({
     queryKey: ["public-organization", slug],
@@ -71,7 +85,7 @@ export default function CustomerBookingPage({ params }: PageProps) {
         fullName,
         email: email || null,
         phone,
-        password,
+        ...(customerAccessToken ? { customerAccessToken } : { password }),
         providerId: selectedProviderId,
         offeringId: selectedOfferingId || null,
         startsAt: selectedSlot.startsAt,
@@ -81,8 +95,13 @@ export default function CustomerBookingPage({ params }: PageProps) {
       });
     },
     onSuccess: (booking) => {
-      if (booking.paymentType === "online" && booking.paymentCheckoutUrl) {
-        window.location.href = booking.paymentCheckoutUrl;
+      if (booking.paymentType === "online") {
+        if (!booking.paymentClientSecret) {
+          throw new Error("Pagamento online indisponível para este agendamento.");
+        }
+
+        window.sessionStorage.setItem(`stripe_client_secret:${booking.id}`, booking.paymentClientSecret);
+        window.location.href = `/clientes/${slug}/pagamento?bookingId=${booking.id}`;
       }
     }
   });
@@ -91,7 +110,7 @@ export default function CustomerBookingPage({ params }: PageProps) {
     fullName
       && email
       && phone
-      && password.length >= 8
+      && (customerAccessToken || password.length >= 8)
       && selectedSlot
       && selectedProviderId
       && (paymentType === "presential" || hasOnlinePrice)
@@ -114,10 +133,14 @@ export default function CustomerBookingPage({ params }: PageProps) {
         <div className="mx-auto max-w-7xl px-6 py-6 md:px-10">
           <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <BrandLogo showSlogan size="sm" />
-            <Link className="inline-flex items-center gap-2 text-sm font-medium text-slate-300 hover:text-white" href="/clientes">
-              <ArrowLeft className="h-4 w-4" />
-              Voltar para estabelecimentos
-            </Link>
+            <div className="flex flex-wrap items-center gap-3">
+              <Link className="inline-flex items-center gap-2 text-sm font-medium text-slate-300 hover:text-white" href="/clientes">
+                <ArrowLeft className="h-4 w-4" />
+                Voltar
+              </Link>
+              <ButtonLink href={`/cliente/criar-conta?estabelecimento=${slug}`} variant="secondary">Criar conta</ButtonLink>
+              <ButtonLink href="/cliente/login">Conectar</ButtonLink>
+            </div>
           </header>
         </div>
       </section>
@@ -296,7 +319,7 @@ export default function CustomerBookingPage({ params }: PageProps) {
                       <CreditCard className="h-4 w-4 text-sky-300" />
                       Pagar online
                     </span>
-                    <p className="mt-1 text-xs text-slate-400">Abre o checkout do Mercado Pago após confirmar.</p>
+                    <p className="mt-1 text-xs text-slate-400">Abre o pagamento seguro após confirmar.</p>
                   </button>
                 </div>
                 {!hasOnlinePrice ? (
@@ -309,11 +332,18 @@ export default function CustomerBookingPage({ params }: PageProps) {
                   <CalendarDays className="h-4 w-4 text-sky-300" />
                   <p className="text-sm font-semibold text-white">Cadastro final do cliente</p>
                 </div>
+                {customerAccessToken ? (
+                  <p className="mt-3 rounded-lg border border-emerald-300/20 bg-emerald-300/10 p-3 text-sm text-emerald-100">
+                    Conta conectada. O agendamento será associado ao seu painel de cliente.
+                  </p>
+                ) : null}
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
                   <Input onChange={(event) => setFullName(event.target.value)} placeholder="Nome completo" value={fullName} />
                   <Input onChange={(event) => setEmail(event.target.value)} placeholder="E-mail" type="email" value={email} />
                   <Input onChange={(event) => setPhone(event.target.value)} placeholder="Telefone" value={phone} />
-                  <Input onChange={(event) => setPassword(event.target.value)} placeholder="Senha" type="password" value={password} />
+                  {!customerAccessToken ? (
+                    <Input onChange={(event) => setPassword(event.target.value)} placeholder="Senha" type="password" value={password} />
+                  ) : null}
                 </div>
               </div>
 

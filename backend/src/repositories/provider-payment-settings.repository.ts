@@ -17,11 +17,15 @@ export class ProviderPaymentSettingsRepository {
       commissionRateBps: settings.commissionRateBps,
       onlineDiscountBps: settings.onlineDiscountBps,
       absorbsProcessingFee: settings.absorbsProcessingFee,
-      mercadoPagoConnected: settings.mercadoPagoConnected,
-      mercadoPagoUserId: settings.mercadoPagoUserId,
-      mercadoPagoAccessToken: settings.mercadoPagoAccessToken,
-      mercadoPagoRefreshToken: settings.mercadoPagoRefreshToken,
-      mercadoPagoTokenExpiresAt: settings.mercadoPagoTokenExpiresAt?.toISOString() ?? null,
+      stripeAccountId: settings.provider?.stripeAccountId ?? null,
+      stripeChargesEnabled: settings.stripeChargesEnabled,
+      stripePayoutsEnabled: settings.stripePayoutsEnabled,
+      stripeDetailsSubmitted: settings.stripeDetailsSubmitted,
+      stripeCurrentlyDue: settings.stripeCurrentlyDue ?? [],
+      stripeEventuallyDue: settings.stripeEventuallyDue ?? [],
+      stripePastDue: settings.stripePastDue ?? [],
+      stripeDisabledReason: settings.stripeDisabledReason,
+      stripeAccountStatus: settings.stripeAccountStatus as ProviderPaymentSettings["stripeAccountStatus"],
     };
   }
 
@@ -34,6 +38,9 @@ export class ProviderPaymentSettingsRepository {
       where: {
         organizationId,
         providerId,
+      },
+      relations: {
+        provider: true,
       },
     });
 
@@ -58,7 +65,14 @@ export class ProviderPaymentSettingsRepository {
       commissionRateBps: 1000,
       onlineDiscountBps: 500,
       absorbsProcessingFee: true,
-      mercadoPagoConnected: false,
+      stripeChargesEnabled: false,
+      stripePayoutsEnabled: false,
+      stripeDetailsSubmitted: false,
+      stripeCurrentlyDue: [],
+      stripeEventuallyDue: [],
+      stripePastDue: [],
+      stripeDisabledReason: null,
+      stripeAccountStatus: "pending",
     });
 
     return this.mapSettings(settings);
@@ -78,24 +92,31 @@ export class ProviderPaymentSettingsRepository {
       commissionRateBps: input.commissionRateBps ?? current.commissionRateBps,
       onlineDiscountBps: input.onlineDiscountBps ?? current.onlineDiscountBps,
       absorbsProcessingFee: input.absorbsProcessingFee ?? current.absorbsProcessingFee,
-      mercadoPagoConnected: current.mercadoPagoConnected,
-      mercadoPagoUserId: current.mercadoPagoUserId ?? null,
-      mercadoPagoAccessToken: current.mercadoPagoAccessToken ?? null,
-      mercadoPagoRefreshToken: current.mercadoPagoRefreshToken ?? null,
-      mercadoPagoTokenExpiresAt: current.mercadoPagoTokenExpiresAt ? new Date(current.mercadoPagoTokenExpiresAt) : null,
+      stripeChargesEnabled: current.stripeChargesEnabled,
+      stripePayoutsEnabled: current.stripePayoutsEnabled,
+      stripeDetailsSubmitted: current.stripeDetailsSubmitted,
+      stripeCurrentlyDue: current.stripeCurrentlyDue,
+      stripeEventuallyDue: current.stripeEventuallyDue,
+      stripePastDue: current.stripePastDue,
+      stripeDisabledReason: current.stripeDisabledReason ?? null,
+      stripeAccountStatus: current.stripeAccountStatus,
     });
 
     return this.mapSettings(await repository.save(settings));
   }
 
-  public async saveMercadoPagoConnection(
+  public async updateStripeAccountStatus(
     organizationId: string,
     providerId: string,
     input: {
-      mercadoPagoUserId: string;
-      mercadoPagoAccessToken: string;
-      mercadoPagoRefreshToken: string;
-      mercadoPagoTokenExpiresAt: Date;
+      chargesEnabled: boolean;
+      payoutsEnabled: boolean;
+      detailsSubmitted: boolean;
+      currentlyDue: string[];
+      eventuallyDue: string[];
+      pastDue: string[];
+      disabledReason?: string | null;
+      accountStatus: ProviderPaymentSettings["stripeAccountStatus"];
     },
     manager?: EntityManager,
   ): Promise<ProviderPaymentSettings> {
@@ -107,11 +128,14 @@ export class ProviderPaymentSettingsRepository {
       commissionRateBps: current.commissionRateBps,
       onlineDiscountBps: current.onlineDiscountBps,
       absorbsProcessingFee: current.absorbsProcessingFee,
-      mercadoPagoConnected: true,
-      mercadoPagoUserId: input.mercadoPagoUserId,
-      mercadoPagoAccessToken: input.mercadoPagoAccessToken,
-      mercadoPagoRefreshToken: input.mercadoPagoRefreshToken,
-      mercadoPagoTokenExpiresAt: input.mercadoPagoTokenExpiresAt,
+      stripeChargesEnabled: input.chargesEnabled,
+      stripePayoutsEnabled: input.payoutsEnabled,
+      stripeDetailsSubmitted: input.detailsSubmitted,
+      stripeCurrentlyDue: input.currentlyDue,
+      stripeEventuallyDue: input.eventuallyDue,
+      stripePastDue: input.pastDue,
+      stripeDisabledReason: input.disabledReason ?? null,
+      stripeAccountStatus: input.accountStatus,
     });
 
     return this.mapSettings(await repository.save(settings));

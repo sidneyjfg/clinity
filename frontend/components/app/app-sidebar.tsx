@@ -16,7 +16,8 @@ import {
   Settings,
   UserCircle2,
   UserRoundCog,
-  UsersRound
+  UsersRound,
+  Wallet
 } from "lucide-react";
 import { useState } from "react";
 
@@ -41,6 +42,7 @@ const navigation: Array<{
   { href: "/automations", label: "Automações", icon: Bot, roles: ["administrator"] },
   { href: "/reports", label: "Relatórios", icon: BarChart3, roles: ["administrator", "reception"] },
   { href: "/account", label: "Conta", icon: UserCircle2, roles: ["administrator", "reception", "provider"] },
+  { href: "/payments", label: "Pagamentos", icon: Wallet, roles: ["administrator"] },
   { href: "/settings", label: "Configurações", icon: Settings, roles: ["administrator"] }
 ];
 

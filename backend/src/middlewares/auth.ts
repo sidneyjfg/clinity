@@ -34,6 +34,7 @@ export const authMiddleware = async (request: FastifyRequest, _reply: FastifyRep
     id: claims.sub,
     organizationId: claims.organizationId,
     role: claims.role,
+    providerId: claims.providerId ?? null,
     sessionId: claims.sessionId,
   };
 };

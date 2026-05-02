@@ -17,8 +17,8 @@ export class PaymentTransactionsRepository {
       bookingId: string;
       providerId: string;
       breakdown: PaymentBreakdown;
-      mercadoPagoPreferenceId?: string | null;
       checkoutUrl?: string | null;
+      idempotencyKey?: string | null;
     },
     manager?: EntityManager,
   ): Promise<PaymentTransactionEntity> {
@@ -28,8 +28,10 @@ export class PaymentTransactionsRepository {
       bookingId: input.bookingId,
       providerId: input.providerId,
       status: input.breakdown.paymentStatus,
-      mercadoPagoPreferenceId: input.mercadoPagoPreferenceId ?? null,
-      mercadoPagoPaymentId: null,
+      stripePaymentIntentId: null,
+      stripeChargeId: null,
+      idempotencyKey: input.idempotencyKey ?? null,
+      clientSecret: null,
       originalAmountCents: input.breakdown.originalAmountCents,
       discountedAmountCents: input.breakdown.discountedAmountCents,
       onlineDiscountCents: input.breakdown.onlineDiscountCents,
@@ -48,12 +50,22 @@ export class PaymentTransactionsRepository {
     });
   }
 
+  public async findByStripePaymentIntentId(
+    stripePaymentIntentId: string,
+    manager?: EntityManager,
+  ): Promise<PaymentTransactionEntity | null> {
+    return this.getRepository(manager).findOne({
+      where: { stripePaymentIntentId },
+    });
+  }
+
   public async updateGatewayResult(
     id: string,
     input: {
       status: PaymentStatus;
-      mercadoPagoPreferenceId?: string | null;
-      mercadoPagoPaymentId?: string | null;
+      stripePaymentIntentId?: string | null;
+      stripeChargeId?: string | null;
+      clientSecret?: string | null;
       checkoutUrl?: string | null;
       rawGatewayPayload?: unknown | null;
     },
@@ -62,12 +74,13 @@ export class PaymentTransactionsRepository {
     const repository = this.getRepository(manager);
     const transaction = await repository.findOneOrFail({ where: { id } });
     transaction.status = input.status;
-    transaction.mercadoPagoPreferenceId = input.mercadoPagoPreferenceId === undefined
-      ? transaction.mercadoPagoPreferenceId
-      : input.mercadoPagoPreferenceId;
-    transaction.mercadoPagoPaymentId = input.mercadoPagoPaymentId === undefined
-      ? transaction.mercadoPagoPaymentId
-      : input.mercadoPagoPaymentId;
+    transaction.stripePaymentIntentId = input.stripePaymentIntentId === undefined
+      ? transaction.stripePaymentIntentId
+      : input.stripePaymentIntentId;
+    transaction.stripeChargeId = input.stripeChargeId === undefined
+      ? transaction.stripeChargeId
+      : input.stripeChargeId;
+    transaction.clientSecret = input.clientSecret === undefined ? transaction.clientSecret : input.clientSecret;
     transaction.checkoutUrl = input.checkoutUrl === undefined ? transaction.checkoutUrl : input.checkoutUrl;
     transaction.rawGatewayPayload = input.rawGatewayPayload === undefined ? transaction.rawGatewayPayload : input.rawGatewayPayload;
 

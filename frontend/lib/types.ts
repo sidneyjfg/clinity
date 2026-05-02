@@ -88,6 +88,7 @@ export type Provider = {
   fullName: string;
   specialty: string;
   isActive: boolean;
+  stripeAccountId?: string | null;
 };
 
 export type ProviderAvailability = {
@@ -110,7 +111,21 @@ export type ServiceOffering = {
   name: string;
   durationMinutes: number;
   priceCents?: number | null;
+  requireOnlinePayment: boolean;
   isActive: boolean;
+};
+
+export type SystemAdminMarketplaceAudit = {
+  organizationId: string;
+  organizationName: string;
+  onlineRevenueCents: number;
+  onlineCommissionCents: number;
+  presentialRevenueCents: number;
+  presentialCommissionCents: number;
+  onlineCount: number;
+  presentialCount: number;
+  pendingStatusCount: number;
+  presentialRatio: number;
 };
 
 export type Booking = {
@@ -135,7 +150,10 @@ export type Booking = {
   providerNetAmountCents?: number;
   paymentStatus?: "not_required" | "pending" | "approved" | "rejected" | "cancelled" | "pending_local";
   paymentCheckoutUrl?: string | null;
+  paymentClientSecret?: string | null;
 };
+
+export type StripeAccountStatus = "pending" | "verified" | "restricted";
 
 export type ProviderPaymentSettings = {
   providerId: string;
@@ -143,18 +161,65 @@ export type ProviderPaymentSettings = {
   commissionRateBps: number;
   onlineDiscountBps: number;
   absorbsProcessingFee: boolean;
-  mercadoPagoConnected: boolean;
-  mercadoPagoUserId?: string | null;
-  mercadoPagoAccessToken?: string | null;
-  mercadoPagoRefreshToken?: string | null;
-  mercadoPagoTokenExpiresAt?: string | null;
+  stripeAccountId?: string | null;
+  stripeChargesEnabled: boolean;
+  stripePayoutsEnabled: boolean;
+  stripeDetailsSubmitted: boolean;
+  stripeCurrentlyDue: string[];
+  stripeEventuallyDue: string[];
+  stripePastDue: string[];
+  stripeDisabledReason?: string | null;
+  stripeAccountStatus: StripeAccountStatus;
 };
 
 export type OrganizationPaymentSettings = Omit<ProviderPaymentSettings, "providerId">;
 
-export type MercadoPagoConnectUrl = {
-  providerId: string;
-  authorizationUrl: string;
+export type StripeConnectAccount = {
+  providerId?: string;
+  organizationId?: string;
+  stripeAccountId: string;
+  chargesEnabled: boolean;
+  payoutsEnabled: boolean;
+  detailsSubmitted: boolean;
+};
+
+export type StripeOnboardingLink = {
+  providerId?: string;
+  organizationId?: string;
+  onboardingUrl: string;
+};
+
+export type StripeAccountStatusResponse = {
+  providerId?: string;
+  organizationId?: string;
+  status: StripeAccountStatus;
+  chargesEnabled: boolean;
+  payoutsEnabled: boolean;
+  detailsSubmitted: boolean;
+  currentlyDue: string[];
+  eventuallyDue: string[];
+  pastDue: string[];
+  disabledReason?: string | null;
+  canReceivePayments: boolean;
+  canRequestPayouts: boolean;
+  blockedReasons: string[];
+};
+
+export type StripeBalance = {
+  providerId?: string;
+  organizationId?: string;
+  available: Array<{ amount: number; currency: string }>;
+  pending: Array<{ amount: number; currency: string }>;
+};
+
+export type FinancialHistoryItem = {
+  amountCents: number;
+  currency: string;
+  type: string;
+  status: string;
+  createdAt: string;
+  failureReason?: string | null;
+  metadata?: unknown | null;
 };
 
 export type AutomationSettings = {

@@ -32,6 +32,7 @@ export class PublicBookingsController {
       email?: string | null;
       phone?: string;
       password?: string;
+      customerAccessToken?: string;
       providerId?: string;
       offeringId?: string | null;
       startsAt?: string;
@@ -44,7 +45,8 @@ export class PublicBookingsController {
       fullName: body.fullName ?? "",
       email: body.email ?? null,
       phone: body.phone ?? "",
-      password: body.password ?? "",
+      ...(body.password ? { password: body.password } : {}),
+      ...(body.customerAccessToken ? { customerAccessToken: body.customerAccessToken } : {}),
       providerId: body.providerId ?? "",
       offeringId: body.offeringId ?? null,
       startsAt: body.startsAt ?? "",
@@ -52,5 +54,17 @@ export class PublicBookingsController {
       notes: body.notes ?? null,
       paymentType: body.paymentType ?? "presential",
     }));
+  };
+
+  public signUpCustomer = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+    reply.status(201).send(await this.publicBookingsService.signUpCustomer(request.body));
+  };
+
+  public signInCustomer = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+    reply.status(200).send(await this.publicBookingsService.signInCustomer(request.body));
+  };
+
+  public getCustomerPortal = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+    reply.status(200).send(await this.publicBookingsService.getCustomerPortal(request.headers.authorization));
   };
 }

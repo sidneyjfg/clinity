@@ -49,4 +49,8 @@ export class SystemAdminController {
   public getOperationalSummary = async (_request: FastifyRequest, reply: FastifyReply): Promise<void> => {
     reply.status(200).send(await this.systemAdminService.getOperationalSummary());
   };
+
+  public getMarketplaceAudit = async (_request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+    reply.status(200).send(await this.systemAdminService.getMarketplaceAudit());
+  };
 }

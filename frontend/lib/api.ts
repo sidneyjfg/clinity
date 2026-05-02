@@ -7,11 +7,12 @@ import {
   type AuthSessionDTO,
   type OrganizationDTO,
   type IntegrationSummaryDTO,
+  type MarketplaceAuditDTO,
   type MeResponseDTO,
-  type MercadoPagoConnectUrlDTO,
   type NoShowOverviewDTO,
   type CustomerDTO,
   type CustomerWriteDTO,
+  type FinancialHistoryItemDTO,
   type OrganizationPaymentSettingsDTO,
   type ProviderPaymentSettingsDTO,
   type ProviderPaymentSettingsUpdateDTO,
@@ -22,8 +23,14 @@ import {
   type PublicAvailableSlotDTO,
   type PublicBookingPageDTO,
   type PublicBookingWriteDTO,
+  type PublicCustomerPortalDTO,
+  type PublicCustomerSessionDTO,
   type SignInInputDTO,
   type SignUpInputDTO,
+  type StripeAccountStatusDTO,
+  type StripeBalanceDTO,
+  type StripeConnectAccountDTO,
+  type StripeOnboardingLinkDTO,
   type UpdateAccountInputDTO,
   type UpdateOrganizationInputDTO,
   type UpdatePasswordInputDTO,
@@ -155,10 +162,42 @@ export const api = {
     });
   },
 
-  createOrganizationMercadoPagoConnectUrl() {
-    return apiRequest<MercadoPagoConnectUrlDTO>(apiRoutes.organizations.mercadoPagoConnect, {
+  createOrganizationStripeAccount() {
+    return apiRequest<StripeConnectAccountDTO>(apiRoutes.organizations.stripeAccount, {
       method: "POST",
       auth: true
+    });
+  },
+
+  createOrganizationStripeOnboardingLink(input?: { refreshUrl?: string; returnUrl?: string }) {
+    return apiRequest<StripeOnboardingLinkDTO>(apiRoutes.organizations.stripeOnboarding, {
+      method: "POST",
+      auth: true,
+      body: input ?? {}
+    });
+  },
+
+  getOrganizationStripeBalance() {
+    return apiRequest<StripeBalanceDTO>(apiRoutes.organizations.stripeBalance, { auth: true });
+  },
+
+  getOrganizationStripeAccountStatus() {
+    return apiRequest<StripeAccountStatusDTO>(apiRoutes.organizations.stripeStatus, { auth: true });
+  },
+
+  getOrganizationStripeTransactions() {
+    return apiRequest<{ items: FinancialHistoryItemDTO[] }>(apiRoutes.organizations.stripeTransactions, { auth: true });
+  },
+
+  getOrganizationStripePayouts() {
+    return apiRequest<{ items: FinancialHistoryItemDTO[] }>(apiRoutes.organizations.stripePayouts, { auth: true });
+  },
+
+  requestOrganizationStripePayout(input: { amountCents: number; currency: string; idempotencyKey?: string }) {
+    return apiRequest<{ payoutId: string; amount: number; currency: string; status: string }>(apiRoutes.organizations.stripePayouts, {
+      method: "POST",
+      auth: true,
+      body: input
     });
   },
 
@@ -244,11 +283,27 @@ export const api = {
     });
   },
 
-  createMercadoPagoConnectUrl(providerId: string) {
-    return apiRequest<MercadoPagoConnectUrlDTO>(apiRoutes.providers.mercadoPagoConnect(providerId), {
+  createStripeOnboardingLink(providerId: string) {
+    return apiRequest<StripeOnboardingLinkDTO>(apiRoutes.providers.stripeOnboarding(providerId), {
       method: "POST",
       auth: true
     });
+  },
+
+  getStripeBalance(providerId: string) {
+    return apiRequest<StripeBalanceDTO>(apiRoutes.providers.stripeBalance(providerId), { auth: true });
+  },
+
+  getStripeAccountStatus(providerId: string) {
+    return apiRequest<StripeAccountStatusDTO>(apiRoutes.providers.stripeStatus(providerId), { auth: true });
+  },
+
+  getStripeTransactions(providerId: string) {
+    return apiRequest<{ items: FinancialHistoryItemDTO[] }>(apiRoutes.providers.stripeTransactions(providerId), { auth: true });
+  },
+
+  getStripePayouts(providerId: string) {
+    return apiRequest<{ items: FinancialHistoryItemDTO[] }>(apiRoutes.providers.stripePayouts(providerId), { auth: true });
   },
 
   getProviderAvailability(providerId: string) {
@@ -459,6 +514,34 @@ export const api = {
     return apiRequest<BookingDTO>(apiRoutes.publicOrganizations.bookings(slug), {
       method: "POST",
       body: input
+    });
+  },
+
+  signUpPublicCustomer(input: { slug: string; fullName: string; email?: string | null; phone: string; password: string }) {
+    return apiRequest<PublicCustomerSessionDTO>(apiRoutes.publicCustomers.signUp, {
+      method: "POST",
+      body: input
+    });
+  },
+
+  signInPublicCustomer(input: { emailOrPhone: string; password: string }) {
+    return apiRequest<PublicCustomerSessionDTO>(apiRoutes.publicCustomers.signIn, {
+      method: "POST",
+      body: input
+    });
+  },
+
+  getPublicCustomerPortal(accessToken: string) {
+    return apiRequest<PublicCustomerPortalDTO>(apiRoutes.publicCustomers.me, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      }
+    });
+  },
+
+  getMarketplaceAudit() {
+    return apiRequest<MarketplaceAuditDTO[]>(apiRoutes.systemAdmin.marketplaceAudit, {
+      auth: true
     });
   }
 };

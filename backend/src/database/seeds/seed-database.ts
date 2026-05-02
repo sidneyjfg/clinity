@@ -34,8 +34,8 @@ export const seedDatabase = async (dataSource: DataSource): Promise<void> => {
         galleryImageUrls: [...organization.galleryImageUrls],
       })),
     );
-    await manager.save(UserEntity, [...seedData.users]);
     await manager.save(ProviderEntity, [...seedData.providers]);
+    await manager.save(UserEntity, [...seedData.users]);
     await manager.save(ProviderAvailabilityEntity, [...seedData.providerAvailabilities]);
     await manager.save(ServiceOfferingEntity, [...seedData.serviceOfferings]);
     await manager.save(CustomerEntity, [...seedData.customers]);
