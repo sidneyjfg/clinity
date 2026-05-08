@@ -195,6 +195,13 @@ describe("Payments routes", () => {
     });
     expect(settingsResponse.statusCode).toBe(200);
 
+    const organizationAccountResponse = await app.inject({
+      method: "POST",
+      url: "/v1/organization/stripe/accounts",
+      headers,
+    });
+    expect(organizationAccountResponse.statusCode).toBe(200);
+
     const accountResponse = await app.inject({
       method: "POST",
       url: "/v1/providers/pro_001/stripe/accounts",
@@ -257,6 +264,7 @@ describe("Payments routes", () => {
         organizationId: "cln_main_001",
         providerId: "pro_001",
         offeringId: "svc_001",
+        status: "payment_pending",
         paymentType: "online",
         paymentStatus: "pending",
         originalAmountCents: 18000,

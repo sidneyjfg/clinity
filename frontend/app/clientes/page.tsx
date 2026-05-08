@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, CalendarDays, MapPin, Search, ShieldCheck, Sparkles, Stethoscope } from "lucide-react";
 
@@ -10,6 +10,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
+import { getCustomerSession } from "@/lib/customer-session";
 
 function normalizeSearchValue(value: string): string {
   return value
@@ -21,6 +22,12 @@ function normalizeSearchValue(value: string): string {
 
 export default function CustomerMarketplacePage() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [customerName, setCustomerName] = useState("");
+
+  useEffect(() => {
+    const session = getCustomerSession();
+    setCustomerName(session?.customer.fullName ?? "");
+  }, []);
   const organizationsQuery = useQuery({
     queryKey: ["public-organizations"],
     queryFn: api.listPublicOrganizations
@@ -57,12 +64,20 @@ export default function CustomerMarketplacePage() {
               <ButtonLink href="/signup" variant="secondary">
                 Aba parceiro
               </ButtonLink>
-              <ButtonLink href="/cliente/login" variant="secondary">
-                Conectar conta
-              </ButtonLink>
-              <ButtonLink href="/cliente/criar-conta">
-                Criar conta
-              </ButtonLink>
+              {customerName ? (
+                <ButtonLink href="/cliente">
+                  Minha conta
+                </ButtonLink>
+              ) : (
+                <>
+                  <ButtonLink href="/cliente/login" variant="secondary">
+                    Conectar conta
+                  </ButtonLink>
+                  <ButtonLink href="/cliente/criar-conta">
+                    Criar conta
+                  </ButtonLink>
+                </>
+              )}
             </div>
           </header>
         </div>
@@ -75,11 +90,17 @@ export default function CustomerMarketplacePage() {
             Encontre um estabelecimento e agende com segurança.
           </h1>
           <p className="mt-5 max-w-2xl text-base leading-7 text-slate-300">
-            Escolha a clínica, profissional, serviço e horário. O cadastro acontece no final do agendamento com nome, e-mail, telefone e senha para próximos acessos e comunicações da clínica.
+            Escolha a clínica, profissional, serviço e horário. Ao entrar como cliente, seus dados de perfil são reaproveitados no agendamento e no histórico.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
-            <ButtonLink href="/cliente/criar-conta">Criar conta de cliente</ButtonLink>
-            <ButtonLink href="/cliente/login" variant="secondary">Já tenho conta</ButtonLink>
+            {customerName ? (
+              <ButtonLink href="/cliente">Abrir perfil de {customerName}</ButtonLink>
+            ) : (
+              <>
+                <ButtonLink href="/cliente/criar-conta">Criar conta de cliente</ButtonLink>
+                <ButtonLink href="/cliente/login" variant="secondary">Já tenho conta</ButtonLink>
+              </>
+            )}
           </div>
           <div className="mt-8 grid gap-3 sm:grid-cols-3">
             <div className="rounded-lg border border-white/10 bg-white/5 p-4">

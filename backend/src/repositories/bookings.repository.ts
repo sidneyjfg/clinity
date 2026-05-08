@@ -5,6 +5,35 @@ import { BookingEntity } from "../database/entities";
 import type { Booking, BookingPaymentStatus, BookingPaymentType, BookingStatus, NoShowOverview } from "../types/booking";
 import { buildPaginatedResult, getPaginationOffset, type PaginatedResult, type Pagination } from "../utils/pagination";
 
+const ONLINE_PAYMENT_HOLD_MINUTES = 15;
+const blockingBookingStatuses = new Set(["scheduled", "confirmed", "rescheduled", "attended", "missed"]);
+
+export const isBookingBlockingSlot = (booking: {
+  status: string;
+  paymentType?: string | null;
+  paymentStatus?: string | null;
+  createdAt?: Date | string;
+}, now: Date = new Date()): boolean => {
+  if (booking.status === "cancelled") {
+    return false;
+  }
+
+  if (blockingBookingStatuses.has(booking.status)) {
+    return true;
+  }
+
+  if (booking.status !== "payment_pending" || booking.paymentType !== "online" || booking.paymentStatus !== "pending") {
+    return false;
+  }
+
+  const createdAt = booking.createdAt instanceof Date ? booking.createdAt : new Date(booking.createdAt ?? 0);
+  if (Number.isNaN(createdAt.getTime())) {
+    return false;
+  }
+
+  return now.getTime() - createdAt.getTime() < ONLINE_PAYMENT_HOLD_MINUTES * 60 * 1000;
+};
+
 export class BookingsRepository {
   public constructor(private readonly dataSource: DataSource) {}
 
@@ -36,6 +65,7 @@ export class BookingsRepository {
       providerNetAmountCents: booking.providerNetAmountCents,
       paymentStatus: booking.paymentStatus as BookingPaymentStatus,
       paymentCheckoutUrl: booking.paymentCheckoutUrl,
+      createdAt: booking.createdAt.toISOString(),
     };
   }
 
@@ -278,20 +308,15 @@ export class BookingsRepository {
     manager: EntityManager,
     excludeId?: string,
   ): Promise<boolean> {
-    const query = this.getRepository(manager)
+    const bookings = await this.getRepository(manager)
       .createQueryBuilder("booking")
       .where("booking.organizationId = :organizationId", { organizationId })
       .andWhere("booking.providerId = :providerId", { providerId })
-      .andWhere("booking.status != :cancelledStatus", { cancelledStatus: "cancelled" })
       .andWhere("booking.startsAt < :endsAt", { endsAt })
-      .andWhere("booking.endsAt > :startsAt", { startsAt });
+      .andWhere("booking.endsAt > :startsAt", { startsAt })
+      .getMany();
 
-    if (excludeId) {
-      query.andWhere("booking.id != :excludeId", { excludeId });
-    }
-
-    const conflictCount = await query.getCount();
-    return conflictCount > 0;
+    return bookings.some((booking) => booking.id !== excludeId && isBookingBlockingSlot(booking));
   }
 
   public async buildNoShowOverview(

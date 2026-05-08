@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { CalendarDays, LogOut, MapPin, ReceiptText } from "lucide-react";
+import { CalendarDays, LogOut, Mail, MapPin, Phone, ReceiptText, UserRound } from "lucide-react";
 
 import { BrandLogo } from "@/components/app/brand-logo";
 import { Button, ButtonLink } from "@/components/ui/button";
@@ -58,7 +58,7 @@ export default function CustomerPortalPage() {
         <div className="mb-8">
           <p className="text-sm uppercase tracking-[0.18em] text-sky-300">Minha conta</p>
           <h1 className="mt-2 text-3xl font-semibold text-white">{portal?.customer.fullName ?? "Cliente"}</h1>
-          <p className="mt-2 text-sm text-slate-400">{portal?.customer.email ?? portal?.customer.phone ?? "Carregando..."}</p>
+          <p className="mt-2 text-sm text-slate-400">Perfil usado para agendamentos, agenda e histórico.</p>
         </div>
 
         {portalQuery.error ? (
@@ -69,30 +69,53 @@ export default function CustomerPortalPage() {
         ) : null}
 
         <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-          <Card>
-            <div className="mb-5 flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-sky-300" />
-              <p className="font-semibold text-white">Últimos estabelecimentos</p>
-            </div>
-            <div className="space-y-3">
-              {(portal?.places ?? []).map((place) => (
-                <Link
-                  className="block rounded-lg border border-white/10 bg-white/5 p-4 transition hover:bg-white/10"
-                  href={`/clientes/${place.organizationSlug}`}
-                  key={place.organizationId}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="font-medium text-white">{place.organizationName}</p>
-                      <p className="mt-1 text-sm text-slate-400">{place.visits} agendamentos</p>
+          <div className="space-y-6">
+            <Card>
+              <div className="mb-5 flex items-center gap-2">
+                <UserRound className="h-4 w-4 text-sky-300" />
+                <p className="font-semibold text-white">Perfil</p>
+              </div>
+              <div className="space-y-3 text-sm">
+                <p className="flex items-center gap-2 text-slate-300">
+                  <UserRound className="h-4 w-4 text-slate-500" />
+                  {portal?.customer.fullName ?? "Carregando..."}
+                </p>
+                <p className="flex items-center gap-2 text-slate-300">
+                  <Mail className="h-4 w-4 text-slate-500" />
+                  {portal?.customer.email ?? "E-mail não informado"}
+                </p>
+                <p className="flex items-center gap-2 text-slate-300">
+                  <Phone className="h-4 w-4 text-slate-500" />
+                  {portal?.customer.phone ?? "Telefone não informado"}
+                </p>
+              </div>
+            </Card>
+
+            <Card>
+              <div className="mb-5 flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-sky-300" />
+                <p className="font-semibold text-white">Últimos estabelecimentos</p>
+              </div>
+              <div className="space-y-3">
+                {(portal?.places ?? []).map((place) => (
+                  <Link
+                    className="block rounded-lg border border-white/10 bg-white/5 p-4 transition hover:bg-white/10"
+                    href={`/clientes/${place.organizationSlug}`}
+                    key={place.organizationId}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="font-medium text-white">{place.organizationName}</p>
+                        <p className="mt-1 text-sm text-slate-400">{place.visits} agendamentos</p>
+                      </div>
+                      <p className="text-sm font-semibold text-emerald-200">{formatCurrency(place.spentCents)}</p>
                     </div>
-                    <p className="text-sm font-semibold text-emerald-200">{formatCurrency(place.spentCents)}</p>
-                  </div>
-                </Link>
-              ))}
-              {portal && portal.places.length === 0 ? <p className="text-sm text-slate-400">Nenhum estabelecimento visitado ainda.</p> : null}
-            </div>
-          </Card>
+                  </Link>
+                ))}
+                {portal && portal.places.length === 0 ? <p className="text-sm text-slate-400">Nenhum estabelecimento visitado ainda.</p> : null}
+              </div>
+            </Card>
+          </div>
 
           <div className="space-y-6">
             <Card>

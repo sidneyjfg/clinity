@@ -601,7 +601,7 @@ export class PaymentsService {
 
       const booking = await this.bookingsRepository.updateInOrganization(transaction.organizationId, transaction.bookingId, {
         paymentStatus,
-        ...(paymentStatus === "approved" ? { status: "confirmed" as const } : {}),
+        ...(paymentStatus === "approved" ? { status: "confirmed" as const } : { status: "cancelled" as const }),
       }, manager);
       if (!booking) throw new AppError("bookings.not_found", "Booking not found.", 404);
 

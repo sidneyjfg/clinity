@@ -2,7 +2,7 @@ import type { DataSource, EntityManager } from "typeorm";
 import { z } from "zod";
 
 import { AuditRepository } from "../repositories/audit.repository";
-import { BookingsRepository } from "../repositories/bookings.repository";
+import { BookingsRepository, isBookingBlockingSlot } from "../repositories/bookings.repository";
 import { CustomersRepository } from "../repositories/customers.repository";
 import { OrganizationIntegrationsRepository } from "../repositories/organization-integrations.repository";
 import { OrganizationNotificationSettingsRepository } from "../repositories/organization-notification-settings.repository";
@@ -251,7 +251,7 @@ export class PublicBookingsService {
     });
 
     const busyWindows = existingBookings.items
-      .filter((booking) => booking.providerId === data.providerId && booking.status !== "cancelled")
+      .filter((booking) => booking.providerId === data.providerId && isBookingBlockingSlot(booking))
       .map((booking) => ({
         startsAt: new Date(booking.startsAt),
         endsAt: new Date(booking.endsAt),
@@ -530,7 +530,7 @@ export class PublicBookingsService {
           providerId: data.providerId,
           offeringId: data.offeringId ?? null,
           createdByUserId: null,
-          status: "scheduled",
+          status: paymentBreakdown.paymentType === "online" ? "payment_pending" : "scheduled",
           startsAt,
           endsAt,
           notes: data.notes ?? null,
@@ -579,10 +579,18 @@ export class PublicBookingsService {
       throw new AppError("payments.unavailable", "Payments service unavailable.", 500);
     }
 
-    return this.paymentsService.prepareOnlinePayment({
-      booking: result.booking,
-      ...(result.customerEmail === undefined ? {} : { customerEmail: result.customerEmail }),
-      serviceName: result.serviceName,
-    });
+    try {
+      return await this.paymentsService.prepareOnlinePayment({
+        booking: result.booking,
+        ...(result.customerEmail === undefined ? {} : { customerEmail: result.customerEmail }),
+        serviceName: result.serviceName,
+      });
+    } catch (error) {
+      await this.bookingsRepository.updateInOrganization(organization.id, result.booking.id, {
+        status: "cancelled",
+        paymentStatus: "cancelled",
+      });
+      throw error;
+    }
   }
 }

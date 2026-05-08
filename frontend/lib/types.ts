@@ -5,7 +5,7 @@ export type UserRole = (typeof userRoles)[number];
 export const bookingStatuses = [
   "scheduled",
   "confirmed",
-  "pending",
+  "payment_pending",
   "cancelled",
   "rescheduled",
   "attended",

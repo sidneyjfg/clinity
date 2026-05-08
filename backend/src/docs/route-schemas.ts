@@ -230,7 +230,7 @@ const bookingSchema = {
     serviceName: { type: ["string", "null"] },
     status: {
       type: "string",
-      enum: ["scheduled", "confirmed", "cancelled", "rescheduled", "attended", "missed"],
+      enum: ["scheduled", "confirmed", "payment_pending", "cancelled", "rescheduled", "attended", "missed"],
     },
     startsAt: { type: "string", format: "date-time" },
     endsAt: { type: "string", format: "date-time" },
@@ -375,12 +375,13 @@ const publicBookingListResponseSchema = {
 const publicBookingCreateSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["fullName", "phone", "password", "providerId", "startsAt", "endsAt"],
+  required: ["fullName", "phone", "providerId", "startsAt", "endsAt"],
   properties: {
     fullName: { type: "string", minLength: 3, maxLength: 120 },
     email: { type: ["string", "null"], format: "email" },
     phone: { type: "string", minLength: 10, maxLength: 30 },
     password: { type: "string", minLength: 8, maxLength: 120 },
+    customerAccessToken: { type: "string", minLength: 20 },
     providerId: { type: "string" },
     offeringId: { type: ["string", "null"] },
     startsAt: { type: "string", format: "date-time" },

@@ -1,6 +1,7 @@
 export const bookingStatuses = [
   "scheduled",
   "confirmed",
+  "payment_pending",
   "cancelled",
   "rescheduled",
   "attended",
@@ -33,6 +34,7 @@ export type Booking = {
   paymentStatus: BookingPaymentStatus;
   paymentCheckoutUrl?: string | null;
   paymentClientSecret?: string | null;
+  createdAt?: string;
 };
 
 export type BookingWriteInput = {

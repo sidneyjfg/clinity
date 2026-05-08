@@ -31,6 +31,7 @@ export default function CustomerBookingPage({ params }: PageProps) {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [customerAccessToken, setCustomerAccessToken] = useState("");
+  const [isCustomerConnected, setIsCustomerConnected] = useState(false);
   const [paymentType, setPaymentType] = useState<"online" | "presential">("presential");
 
   useEffect(() => {
@@ -40,6 +41,7 @@ export default function CustomerBookingPage({ params }: PageProps) {
     }
 
     setCustomerAccessToken(session.accessToken);
+    setIsCustomerConnected(true);
     setFullName(session.customer.fullName);
     setEmail(session.customer.email ?? "");
     setPhone(session.customer.phone);
@@ -138,8 +140,14 @@ export default function CustomerBookingPage({ params }: PageProps) {
                 <ArrowLeft className="h-4 w-4" />
                 Voltar
               </Link>
-              <ButtonLink href={`/cliente/criar-conta?estabelecimento=${slug}`} variant="secondary">Criar conta</ButtonLink>
-              <ButtonLink href="/cliente/login">Conectar</ButtonLink>
+              {isCustomerConnected ? (
+                <ButtonLink href="/cliente">Minha conta</ButtonLink>
+              ) : (
+                <>
+                  <ButtonLink href={`/cliente/criar-conta?estabelecimento=${slug}`} variant="secondary">Criar conta</ButtonLink>
+                  <ButtonLink href={`/cliente/login?next=/clientes/${slug}`}>Conectar</ButtonLink>
+                </>
+              )}
             </div>
           </header>
         </div>
@@ -170,7 +178,7 @@ export default function CustomerBookingPage({ params }: PageProps) {
                 </span>
                 <span className="inline-flex items-center gap-2">
                   <ShieldCheck className="h-4 w-4 text-emerald-300" />
-                  Cadastro protegido no final
+                  {isCustomerConnected ? "Conta conectada" : "Cadastro protegido no final"}
                 </span>
               </div>
             </div>
@@ -334,7 +342,7 @@ export default function CustomerBookingPage({ params }: PageProps) {
                 </div>
                 {customerAccessToken ? (
                   <p className="mt-3 rounded-lg border border-emerald-300/20 bg-emerald-300/10 p-3 text-sm text-emerald-100">
-                    Conta conectada. O agendamento será associado ao seu painel de cliente.
+                    Conta conectada. Nome, e-mail e telefone foram preenchidos pelo seu perfil e o agendamento aparecerá no seu painel.
                   </p>
                 ) : null}
                 <div className="mt-4 grid gap-3 md:grid-cols-2">

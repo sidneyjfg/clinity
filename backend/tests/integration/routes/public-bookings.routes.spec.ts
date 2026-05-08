@@ -3,6 +3,7 @@ import type { DataSource } from "typeorm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { buildApp } from "../../../src/app";
+import { BookingEntity } from "../../../src/database/entities";
 import { createTestDataSource } from "../../../src/database/testing/create-test-data-source";
 
 describe("Public bookings routes", () => {
@@ -131,5 +132,95 @@ describe("Public bookings routes", () => {
     });
 
     expect(outsideResponse.statusCode).toBe(409);
+  });
+
+  it("reuses the connected customer profile in the portal and releases stale online payment holds", async () => {
+    const signUpResponse = await app.inject({
+      method: "POST",
+      url: "/v1/public/customers/sign-up",
+      payload: {
+        slug: "organizationa-exemplo",
+        fullName: "Cliente Conectado",
+        email: "cliente-conectado@customer.test",
+        phone: "+5511966666666",
+        password: "password123",
+      },
+    });
+
+    expect(signUpResponse.statusCode).toBe(201);
+    expect(signUpResponse.json().customer).toEqual(
+      expect.objectContaining({
+        fullName: "Cliente Conectado",
+        email: "cliente-conectado@customer.test",
+        phone: "+5511966666666",
+      }),
+    );
+
+    const bookingResponse = await app.inject({
+      method: "POST",
+      url: "/v1/public/organizations/organizationa-exemplo/bookings",
+      payload: {
+        fullName: "Cliente Conectado",
+        email: "cliente-conectado@customer.test",
+        phone: "+5511966666666",
+        customerAccessToken: signUpResponse.json().accessToken,
+        providerId: "pro_001",
+        startsAt: "2026-04-21T16:00:00.000Z",
+        endsAt: "2026-04-21T16:30:00.000Z",
+        paymentType: "presential",
+      },
+    });
+
+    expect(bookingResponse.statusCode).toBe(201);
+
+    const portalResponse = await app.inject({
+      method: "GET",
+      url: "/v1/public/customers/me",
+      headers: {
+        authorization: `Bearer ${signUpResponse.json().accessToken}`,
+      },
+    });
+
+    expect(portalResponse.statusCode).toBe(200);
+    expect(portalResponse.json().customer).toEqual(
+      expect.objectContaining({
+        fullName: "Cliente Conectado",
+        email: "cliente-conectado@customer.test",
+        phone: "+5511966666666",
+      }),
+    );
+    expect(portalResponse.json().bookings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: bookingResponse.json().id,
+          organizationName: "Organizationa Exemplo",
+        }),
+      ]),
+    );
+
+    await dataSource.getRepository(BookingEntity).update(
+      { id: bookingResponse.json().id },
+      {
+        status: "payment_pending",
+        paymentType: "online",
+        paymentStatus: "pending",
+        createdAt: new Date("2026-04-21T15:00:00.000Z"),
+      },
+    );
+
+    const availabilityResponse = await app.inject({
+      method: "GET",
+      url: "/v1/public/organizations/organizationa-exemplo/availability?providerId=pro_001&date=2026-04-21",
+    });
+
+    expect(availabilityResponse.statusCode).toBe(200);
+    expect(availabilityResponse.json().items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          startsAt: "2026-04-21T16:00:00.000Z",
+          endsAt: "2026-04-21T16:30:00.000Z",
+        }),
+      ]),
+    );
   });
 });
